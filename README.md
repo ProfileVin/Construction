@@ -1,1 +1,137 @@
 # Construction
+
+Web app scaffold: React + TypeScript + Vite SPA in [`frontend/`](frontend/),
+ASP.NET Core (.NET 10) Web API in [`backend/`](backend/). First screen delivered
+is an end-to-end **Login** flow (ASP.NET Core Identity + JWT).
+
+## Project docs & AI workflow
+
+This repo is developed AI-first. Living documentation and state tracking live in
+[`docs/`](docs/) and the workflow rules in [`CLAUDE.md`](CLAUDE.md):
+
+| File | Purpose |
+| ---- | ------- |
+| [`CLAUDE.md`](CLAUDE.md) | Operating rules — read-first / update-after checklist |
+| [`docs/PROJECT.md`](docs/PROJECT.md) | Vision, scope, stack, glossary |
+| [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module maps + patterns to reuse |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | ADR log |
+| [`docs/FEATURES.md`](docs/FEATURES.md) | `FEAT-###` registry |
+| [`docs/BUGS.md`](docs/BUGS.md) | `BUG-###` registry |
+| [`docs/DEVELOPMENT_HISTORY.md`](docs/DEVELOPMENT_HISTORY.md) | Append-only session log |
+| [`docs/CONVENTIONS.md`](docs/CONVENTIONS.md) | Coding standards |
+
+`.claude/settings.json` registers a `UserPromptSubmit` hook that injects a digest
+of the trackers + recent history into every prompt, so each session works against
+the full development history.
+
+## Stack
+
+| Layer     | Tech                                                                                             |
+| --------- | ----------------------------------------------------------------------------------------------- |
+| Frontend  | React 19, TypeScript, Vite, Tailwind CSS v4, PrimeReact + PrimeIcons, React Router, TanStack Query, Axios, Zustand, React Hook Form, Zod, Day.js |
+| Backend   | .NET 10, ASP.NET Core Web API (minimal APIs), EF Core (SQL Server), ASP.NET Core Identity, JWT bearer auth, FluentValidation, Mapster, Serilog, OpenAPI + Scalar |
+| Database  | SQL Server LocalDB (`(localdb)\MSSQLLocalDB`, database `Construction`)                           |
+
+## Prerequisites
+
+- Node 20+ and npm
+- .NET SDK 10
+- SQL Server LocalDB (ships with Visual Studio / the SQL Server Express installer)
+- `dotnet-ef` global tool for migrations: `dotnet tool install -g dotnet-ef`
+
+## Run the backend
+
+```bash
+cd backend/src/Construction.Api
+dotnet run
+```
+
+- Listens on `http://localhost:5080` (see `Properties/launchSettings.json`).
+- On startup in **Development** it applies EF migrations and seeds a demo user:
+  - **Email:** `admin@construction.local`
+  - **Password:** `Passw0rd!`
+- API docs (Development only): `http://localhost:5080/scalar/v1`
+- Health check: `http://localhost:5080/health`
+
+### Endpoints
+
+| Method | Route                        | Auth        | Purpose                                        |
+| ------ | ---------------------------- | ----------- | --------------------------------------------- |
+| POST   | `/api/auth/register`         | anonymous   | Create account → `{ token, expiresAt, user }` (409 if email taken) |
+| POST   | `/api/auth/login`            | anonymous   | Returns `{ token, expiresAt, user }`          |
+| GET    | `/api/auth/me`               | bearer JWT  | Current user (incl. onboarding state)         |
+| GET    | `/api/onboarding/options`    | anonymous   | Measurement / currency / timezone / temperature option lists |
+| PUT    | `/api/onboarding/preferences`| bearer JWT  | Save workspace preferences → updated user     |
+| PUT    | `/api/onboarding/company`    | bearer JWT  | Save company description → updated user        |
+| POST   | `/api/onboarding/complete`   | bearer JWT  | Mark onboarding done (+ start mode) → updated user |
+| GET    | `/api/projects/options`      | anonymous   | Project Type / Status option lists            |
+| GET    | `/api/projects`              | bearer JWT  | Current user's projects                       |
+| POST   | `/api/projects`              | bearer JWT  | Create a project                             |
+| GET    | `/health`                    | anonymous   | Liveness + DB check                           |
+
+Config lives in `backend/src/Construction.Api/appsettings.json` (`ConnectionStrings:Default`,
+`Jwt:*`). The `Jwt:Key` value there is a development placeholder — replace it for any
+non-local environment (and move it to a secret store).
+
+## Run the frontend
+
+```bash
+cd frontend
+npm install
+npm run dev        # http://localhost:5173
+```
+
+- `frontend/vite.config.ts` proxies `/api` → `http://localhost:5080`, so no CORS
+  setup is needed in dev and `frontend/.env` can leave `VITE_API_URL` blank.
+- For a non-proxied build, set `VITE_API_URL` (see `frontend/.env.example`) to the
+  API base URL including the `/api` prefix.
+
+Scripts (run in `frontend/`): `npm run dev`, `npm run build`, `npm run preview`,
+`npm run lint` (oxlint).
+
+## Project layout
+
+```
+frontend/
+  src/
+    lib/         axios instance (auth header + 401 handling), query client
+    stores/      authStore.ts — zustand + persist (localStorage key "construction-auth")
+    router/      createBrowserRouter: /login (public), / (protected), * -> /
+    components/  ProtectedRoute, SplitLayout
+    features/auth/  auth.schema.ts (zod), auth.api.ts, useLogin.ts, LoginPage.tsx
+    pages/       DashboardPage.tsx — placeholder; new screens get added here
+    assets/      login-hero.jpg
+backend/
+  Construction.slnx
+  src/Construction.Api/
+    Program.cs   DI, CORS, JWT, Serilog, Scalar, endpoint wiring, dev seeding
+    Data/        ApplicationUser (IdentityUser + FullName), AppDbContext
+    Auth/        JwtOptions, JwtTokenService, Contracts, LoginRequestValidator, AuthEndpoints
+    Common/      DbSeeder
+    Migrations/  InitialIdentity
+docs/            AI-first trackers (see "Project docs & AI workflow" above)
+```
+
+### Login page hero image
+
+`frontend/src/features/auth/LoginPage.tsx` imports
+`frontend/src/assets/login-hero.jpg` for the left panel. Replace that file to
+change the photo; the tinted overlay is applied in `SplitLayout`.
+
+### Tailwind v4 + PrimeReact note
+
+`frontend/src/index.css` imports the PrimeReact Lara theme **before**
+`@import "tailwindcss"` so Tailwind utilities win specificity ties. PrimeReact's
+own component CSS survives Tailwind v4's Preflight in this setup; if a widget looks
+unstyled after upgrades, scope Preflight out or pin Tailwind to v3 with
+`corePlugins.preflight = false`.
+
+## New migration
+
+```bash
+cd backend/src/Construction.Api
+dotnet ef migrations add <Name> -o Migrations
+```
+
+Migrations are applied automatically on Development startup; run
+`dotnet ef database update` to apply them manually.

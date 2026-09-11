@@ -1,0 +1,97 @@
+@Construction.Api_HostAddress = http://localhost:5080
+@token = REPLACE_WITH_TOKEN_FROM_LOGIN_RESPONSE
+@projectId = REPLACE_WITH_PROJECT_ID
+
+### Reference — anonymous
+GET {{Construction.Api_HostAddress}}/api/reference/options
+Accept: application/json
+
+### Auth — register
+POST {{Construction.Api_HostAddress}}/api/auth/register
+Content-Type: application/json
+
+{
+  "email": "new-user@example.com",
+  "phoneNumber": null,
+  "password": "Passw0rd!",
+  "excludeFromMarketing": false
+}
+
+### Auth — login
+POST {{Construction.Api_HostAddress}}/api/auth/login
+Content-Type: application/json
+
+{
+  "email": "admin@construction.local",
+  "password": "Passw0rd!"
+}
+
+### Auth — me
+GET {{Construction.Api_HostAddress}}/api/auth/me
+Authorization: Bearer {{token}}
+
+### Onboarding — update preferences
+PUT {{Construction.Api_HostAddress}}/api/onboarding/preferences
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "measurementSystem": "Metric",
+  "currency": "USD",
+  "timeZoneId": "America/New_York",
+  "temperatureUnit": "Celsius"
+}
+
+### Onboarding — update company
+PUT {{Construction.Api_HostAddress}}/api/onboarding/company
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "companyDescription": "Builder"
+}
+
+### Onboarding — complete
+POST {{Construction.Api_HostAddress}}/api/onboarding/complete
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "startMode": "Scratch"
+}
+
+### Projects — list
+GET {{Construction.Api_HostAddress}}/api/projects
+Authorization: Bearer {{token}}
+
+### Projects — create
+POST {{Construction.Api_HostAddress}}/api/projects
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "name": "New Build",
+  "type": "NewHome",
+  "status": "New",
+  "description": "Example project"
+}
+
+### Dashboard — list tasks
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks
+Authorization: Bearer {{token}}
+
+### Dashboard — create task
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "title": "Pour foundation slab",
+  "assigneeName": "Miguel Torres",
+  "assignedDate": "2026-09-15",
+  "deadline": "2026-09-22"
+}
+
+### Dashboard — activity log
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/activity-log
+Authorization: Bearer {{token}}

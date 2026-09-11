@@ -1,0 +1,277 @@
+/* PrimeReact base styles must load before Tailwind so utilities can override. */
+@import 'primereact/resources/themes/lara-light-teal/theme.css';
+@import 'primereact/resources/primereact.min.css';
+@import 'primeicons/primeicons.css';
+
+@import 'tailwindcss';
+
+@theme {
+  --color-brand: #0d6a54;
+  --color-brand-hover: #0b5a48;
+  --color-brand-ink: #0c3b30;
+  --color-accent: #2ee6c5;
+  --color-page: #f4f5f5;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--color-page);
+  font-family: system-ui, 'Segoe UI', Roboto, sans-serif;
+  color: #1f2937;
+}
+
+/* --- PrimeReact component overrides (match the login mockup) --- */
+.p-inputtext {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  padding: 0.75rem 1rem;
+  font-size: 15px;
+}
+.p-inputtext:enabled:hover {
+  border-color: #94a3b8;
+}
+.p-inputtext:enabled:focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+.p-inputtext.p-invalid {
+  border-color: #dc2626;
+}
+
+.p-password {
+  display: block;
+  width: 100%;
+}
+.p-password > .p-inputtext {
+  width: 100%;
+  padding-right: 2.75rem;
+}
+.p-password .p-password-toggle-mask-icon,
+.p-password > i {
+  right: 1rem;
+  color: #64748b;
+}
+
+.p-button:not(.p-button-outlined):not(.p-button-text) {
+  border-radius: 9999px;
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  padding: 0.85rem 1rem;
+  font-weight: 600;
+}
+.p-button:not(.p-button-outlined):not(.p-button-text):enabled:hover {
+  background: var(--color-brand-hover);
+  border-color: var(--color-brand-hover);
+}
+.p-button:focus-visible {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 30%, transparent);
+}
+.p-button.p-button-outlined {
+  border-radius: 9999px;
+  border: 1px solid var(--color-brand);
+  color: var(--color-brand);
+  background: transparent;
+  padding: 0.6rem 1.25rem;
+  font-weight: 600;
+}
+.p-button.p-button-outlined:enabled:hover {
+  background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+}
+
+/* Combined country-code + phone number field (Sign up) */
+.phone-field {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+.phone-field:focus-within {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+.phone-field[data-invalid='true'] {
+  border-color: #dc2626;
+}
+.phone-field .p-dropdown {
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.phone-field .p-dropdown:not(.p-disabled).p-focus {
+  box-shadow: none;
+}
+.phone-field .p-dropdown .p-dropdown-label {
+  padding-right: 0.5rem;
+}
+.phone-field .p-inputtext {
+  border: none;
+  border-radius: 0;
+  flex: 1;
+}
+.phone-field .p-inputtext:enabled:focus {
+  box-shadow: none;
+  border: none;
+}
+.phone-field__divider {
+  width: 1px;
+  align-self: stretch;
+  margin: 0.5rem 0;
+  background: #e2e8f0;
+}
+
+/* Brand-coloured checkbox */
+.p-checkbox .p-checkbox-box.p-highlight,
+.p-checkbox .p-checkbox-box.p-highlight.p-focus {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+}
+
+/* Dropdown — match the tall rounded text inputs (onboarding) */
+.p-dropdown {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+}
+.p-dropdown:not(.p-disabled):hover {
+  border-color: #94a3b8;
+}
+.p-dropdown:not(.p-disabled).p-focus {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+.p-dropdown .p-dropdown-label {
+  padding: 0.75rem 1rem;
+  font-size: 15px;
+}
+.p-dropdown .p-dropdown-label.p-placeholder {
+  color: #94a3b8;
+}
+.p-dropdown-panel .p-dropdown-item.p-highlight {
+  background: color-mix(in srgb, var(--color-brand) 12%, transparent);
+  color: var(--color-brand-ink);
+}
+
+/* Selectable radio card (onboarding "what do you want to do") */
+.select-card {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid #cbd5e1;
+  border-radius: 14px;
+  background: #fff;
+  padding: 1.25rem;
+  cursor: pointer;
+  transition:
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.select-card:hover {
+  border-color: #94a3b8;
+}
+.select-card[data-selected='true'] {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 18%, transparent);
+}
+.select-card:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 30%, transparent);
+}
+.select-card__radio {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border: 2px solid #cbd5e1;
+  border-radius: 9999px;
+}
+.select-card[data-selected='true'] .select-card__radio {
+  border-color: var(--color-brand);
+}
+.select-card__dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 9999px;
+  background: var(--color-brand);
+}
+
+/* --- Dashboard shell additions --- */
+
+/* Clean, borderless tables (Assigned Tasks / Recent Log) */
+.p-datatable .p-datatable-thead > tr > th {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid #e2e8f0;
+  color: #64748b;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 0.75rem 1rem;
+}
+.p-datatable .p-datatable-tbody > tr {
+  background: transparent;
+}
+.p-datatable .p-datatable-tbody > tr > td {
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
+  padding: 0.85rem 1rem;
+  font-size: 14px;
+  color: #1f2937;
+}
+.p-datatable .p-datatable-tbody > tr:hover {
+  background: color-mix(in srgb, var(--color-brand) 4%, transparent);
+}
+
+/* Dialogs (New Project / New Task / log details) */
+.p-dialog {
+  border-radius: 16px;
+  overflow: hidden;
+}
+.p-dialog .p-dialog-header {
+  padding: 1.25rem 1.5rem 0.5rem;
+}
+.p-dialog .p-dialog-title {
+  font-weight: 700;
+  color: var(--color-brand-ink);
+}
+.p-dialog .p-dialog-content {
+  padding: 0.5rem 1.5rem 1.5rem;
+}
+
+/* Avatar (topbar initials) */
+.p-avatar {
+  background: var(--color-brand);
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Topbar search — pill, lighter than the bordered .p-inputtext */
+.topbar-search {
+  border-radius: 9999px;
+  background: var(--color-page);
+  padding: 0.6rem 1rem;
+  min-width: 220px;
+}
+.topbar-search .p-inputtext {
+  border-radius: 0;
+  padding: 0;
+  font-size: 14px;
+  background: transparent;
+}
+.topbar-search .p-inputtext:enabled:focus {
+  box-shadow: none;
+}
