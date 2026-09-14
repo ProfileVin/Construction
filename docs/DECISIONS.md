@@ -359,3 +359,30 @@ to that layer falls back to manual/live checks (as used throughout this
 session) unless a test project is reintroduced later. This does not revert
 ADR-0010's layering decision (Domain/Application/Infrastructure split,
 repository interfaces, entity factories) — only the test project is gone.
+
+## ADR-0013 — Construction.Api: group feature folders under `Features/`; split `Auth/`
+**Status:** Accepted (2026-09-14)
+**Context:** `Construction.Api` kept `Auth/`, `Dashboard/`, `Onboarding/`,
+`Projects/`, `Reference/` as flat top-level folders alongside `Common/` and
+`Properties/`. The user wanted feature slices visually/structurally grouped
+under one `Features/` folder, distinct from cross-cutting concerns
+(`Common/`) and genuinely global identity/JWT wiring (`Auth/`).
+**Decision:** Moved `Dashboard/`, `Onboarding/`, `Projects/`, `Reference/`
+wholesale into `Features/<name>/`. Split `Auth/`: `AuthController.cs`,
+`Contracts.cs`, `LoginRequestValidator.cs`, `RegisterRequestValidator.cs`
+(the login/register feature, same shape as the other controllers) moved to
+`Features/Auth/`; `JwtOptions.cs` and `JwtTokenService.cs` (bound/consumed
+directly by `Program.cs`'s JWT bearer + DI setup) stayed at top-level `Auth/`
+as global identity plumbing. Every moved file's `namespace` line changed
+from `Construction.Api.<X>` to `Construction.Api.Features.<X>` (all files use
+file-scoped `namespace` syntax, one segment per folder level — no
+`.csproj`/`.slnx` changes needed since the project has no explicit
+`<Compile>` globs and the solution only references `.csproj` paths).
+**Consequences:** `Auth/JwtTokenService.cs` now references `UserDto`/
+`LoginResponse` in `Construction.Api.Features.Auth` while itself staying in
+`Construction.Api.Auth` — a two-way reference between the two Auth
+namespaces (legal C#, same assembly), an accepted side effect of splitting
+identity plumbing from the login/register feature rather than moving `Auth/`
+wholesale. `Common/` and `Properties/` are unaffected. `dotnet build` is
+clean (0 warnings/errors); files were moved with `git mv` to preserve blame
+history.

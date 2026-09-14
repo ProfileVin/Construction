@@ -1,5 +1,7 @@
 import { api } from '../../lib/api'
 
+export type ProjectTaskStatus = 'Upcoming' | 'InProgress' | 'Completed'
+
 export interface ProjectTask {
   id: string
   projectId: string
@@ -7,6 +9,9 @@ export interface ProjectTask {
   assigneeName: string
   assignedDate: string
   deadline: string
+  phaseId: string | null
+  phaseName: string | null
+  status: ProjectTaskStatus
   createdAt: string
 }
 
@@ -15,6 +20,8 @@ export interface CreateProjectTaskPayload {
   assigneeName: string
   assignedDate: string
   deadline: string
+  phaseId: string | null
+  status: ProjectTaskStatus
 }
 
 export interface ActivityLogEntry {

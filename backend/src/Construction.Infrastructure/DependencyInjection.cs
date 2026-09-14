@@ -1,6 +1,7 @@
 using Construction.Application.Common;
 using Construction.Application.Dashboard;
 using Construction.Application.Projects;
+using Construction.Application.Schedule;
 using Construction.Infrastructure.Persistence;
 using Construction.Infrastructure.Repositories;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +20,7 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfWork, UnitOfWork>();
         services.AddScoped<IProjectRepository, ProjectRepository>();
         services.AddScoped<IProjectTaskRepository, ProjectTaskRepository>();
+        services.AddScoped<IConstructionPhaseRepository, ConstructionPhaseRepository>();
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
 
         return services;
