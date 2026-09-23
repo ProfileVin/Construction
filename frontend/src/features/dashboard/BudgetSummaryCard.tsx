@@ -15,7 +15,7 @@ const BADGE_STYLES: Record<'positive' | 'negative', string> = {
 
 export function BudgetSummaryCard({ label, amount, currencyCode, onOpenDetails, badge }: BudgetSummaryCardProps) {
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-lg bg-white p-6 shadow-sm">
       <p className="text-sm font-medium text-slate-500">{label}</p>
       <p className="mt-3 text-3xl font-bold text-brand-ink sm:text-4xl">
         {formatCurrency(amount, currencyCode)}

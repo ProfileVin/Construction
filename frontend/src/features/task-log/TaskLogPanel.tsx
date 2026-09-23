@@ -41,7 +41,7 @@ export function TaskLogPanel({ projectId, projectName }: TaskLogPanelProps) {
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h1 className="text-lg font-bold text-brand-ink">Task Log</h1>
           <p className="text-sm text-slate-500">{projectName} · Architectural &amp; Systems Logbook</p>

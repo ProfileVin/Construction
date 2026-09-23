@@ -1,10 +1,14 @@
 using Construction.Application.Budget;
 using Construction.Application.Common;
 using Construction.Application.Dashboard;
+using Construction.Application.Documents;
 using Construction.Application.Projects;
 using Construction.Application.Schedule;
+using Construction.Application.Team;
+using Construction.Infrastructure.Identity;
 using Construction.Infrastructure.Persistence;
 using Construction.Infrastructure.Repositories;
+using Construction.Infrastructure.Storage;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -25,6 +29,12 @@ public static class DependencyInjection
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         services.AddScoped<IBudgetCategoryRepository, BudgetCategoryRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IProjectDocumentRepository, ProjectDocumentRepository>();
+        services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
+        services.AddScoped<IUserDirectory, UserDirectory>();
+
+        services.Configure<LocalFileStorageOptions>(configuration.GetSection(LocalFileStorageOptions.SectionName));
+        services.AddSingleton<IFileStorage, LocalFileStorage>();
 
         return services;
     }

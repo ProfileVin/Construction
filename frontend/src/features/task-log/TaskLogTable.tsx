@@ -34,7 +34,7 @@ export function TaskLogTable({ data, isLoading, page, pageSize, onPageChange }: 
       >
         <Column
           header="S.No"
-          body={(_row: ProjectTask, opts) => (page - 1) * pageSize + opts.rowIndex + 1}
+          body={(_row: ProjectTask, opts) => opts.rowIndex + 1} // rowIndex already includes the page offset (BUG-006)
           style={{ width: '4rem' }}
         />
         <Column

@@ -15,11 +15,14 @@ const LABELS: Record<ProjectTaskStatus, string> = {
 interface StatusBadgeProps {
   status: ProjectTaskStatus
   label?: string
+  /** Tighter padding and smaller type, for dense layouts such as the Schedule phase rows. */
+  compact?: boolean
 }
 
-export function StatusBadge({ status, label }: StatusBadgeProps) {
+export function StatusBadge({ status, label, compact = false }: StatusBadgeProps) {
+  const size = compact ? 'px-2 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'
   return (
-    <span className={`inline-block whitespace-nowrap rounded-full px-3 py-1 text-xs font-semibold ${STYLES[status]}`}>
+    <span className={`inline-block whitespace-nowrap rounded-full font-semibold ${size} ${STYLES[status]}`}>
       {label ?? LABELS[status]}
     </span>
   )

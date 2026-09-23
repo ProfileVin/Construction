@@ -66,6 +66,16 @@ dotnet run
 | POST   | `/api/onboarding/complete`   | bearer JWT  | Mark onboarding done (+ start mode) → updated user |
 | GET    | `/api/projects`              | bearer JWT  | Current user's projects                       |
 | POST   | `/api/projects`              | bearer JWT  | Create a project                             |
+| GET    | `/api/projects/{id}/documents` | bearer JWT | Paged documents (`search`, `format`=Image/Pdf/Word/Spreadsheet/Other, `page`, `pageSize`) |
+| GET    | `/api/projects/{id}/documents/counts` | bearer JWT | Document counts: `all` + per format        |
+| POST   | `/api/projects/{id}/documents` | bearer JWT | Multipart upload (`file`, optional `name`, `phaseId`); ≤ 100 MB, extension allow-list |
+| GET    | `/api/projects/{id}/documents/{docId}/content` | bearer JWT | File bytes; `?download=true` → attachment |
+| GET    | `/api/projects/{id}/team`    | bearer JWT  | Paged team members (`search`, `role`, `status`=Active/Deactivated, `page`, `pageSize`) |
+| GET    | `/api/projects/{id}/team/roles` | bearer JWT | Distinct role titles (for the role filter) |
+| GET    | `/api/projects/{id}/team/export` | bearer JWT | CSV of members matching the same filters (unpaged) |
+| POST   | `/api/projects/{id}/team`    | bearer JWT  | Add a member (name, role, specialty, email, phase); 409 on a duplicate email |
+| PUT    | `/api/projects/{id}/team/{memberId}` | bearer JWT | Edit a member; 409 on a duplicate email |
+| PUT    | `/api/projects/{id}/team/{memberId}/status` | bearer JWT | `{ "status": "Active" \| "Deactivated" }` |
 | GET    | `/health`                    | anonymous   | Liveness + DB check                           |
 
 Config lives in `backend/src/Construction.Api/appsettings.json` (`ConnectionStrings:Default`,

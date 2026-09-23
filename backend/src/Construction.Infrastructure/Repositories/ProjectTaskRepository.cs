@@ -60,6 +60,25 @@ public class ProjectTaskRepository(AppDbContext db) : IProjectTaskRepository
         return (items, totalCount);
     }
 
+    public async Task<IReadOnlyDictionary<string, int>> CountOpenByAssigneeAsync(
+        Guid projectId, CancellationToken cancellationToken)
+    {
+        var rows = await db.ProjectTasks
+            .Where(t => t.ProjectId == projectId && t.Status != ProjectTaskStatus.Completed)
+            .GroupBy(t => t.AssigneeName)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
+            .ToListAsync(cancellationToken);
+
+        // Fold in memory too, so the lookup is case-insensitive regardless of DB collation.
+        var counts = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
+        foreach (var row in rows)
+        {
+            counts[row.Name] = counts.GetValueOrDefault(row.Name) + row.Count;
+        }
+
+        return counts;
+    }
+
     public Task AddAsync(ProjectTask task, CancellationToken cancellationToken)
     {
         db.ProjectTasks.Add(task);

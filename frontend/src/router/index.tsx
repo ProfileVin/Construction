@@ -1,6 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom'
 import { AppShell } from '../components/AppShell'
-import { ComingSoonPage } from '../components/ComingSoonPage'
 import { ProtectedRoute } from '../components/ProtectedRoute'
 import { LoginPage } from '../features/auth/LoginPage'
 import { RegisterPage } from '../features/auth/RegisterPage'
@@ -10,8 +9,10 @@ import { OnboardingProjectPage } from '../features/onboarding/OnboardingProjectP
 import { OnboardingStartPage } from '../features/onboarding/OnboardingStartPage'
 import { BudgetPage } from '../pages/BudgetPage'
 import { DashboardPage } from '../pages/DashboardPage'
+import { DocumentsPage } from '../pages/DocumentsPage'
 import { SchedulePage } from '../pages/SchedulePage'
 import { TaskLogPage } from '../pages/TaskLogPage'
+import { TeamPage } from '../pages/TeamPage'
 
 export const router = createBrowserRouter([
   {
@@ -65,8 +66,8 @@ export const router = createBrowserRouter([
       { path: '/schedule', element: <SchedulePage /> },
       { path: '/task-log', element: <TaskLogPage /> },
       { path: '/budget', element: <BudgetPage /> },
-      { path: '/documents', element: <ComingSoonPage title="Document" /> },
-      { path: '/team', element: <ComingSoonPage title="Team" /> },
+      { path: '/documents', element: <DocumentsPage /> },
+      { path: '/team', element: <TeamPage /> },
     ],
   },
   {

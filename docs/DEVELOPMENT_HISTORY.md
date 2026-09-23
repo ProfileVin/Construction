@@ -17,6 +17,371 @@ Entry template:
 
 ---
 
+## 2026-09-23 — Construction Phases card: design sizing
+**Refs:** BUG-010, FEAT-011
+**What:** Made the card as compact as the design frame (1117 × 618). Only sizes changed; layout, colors, row borders and behavior are the same.
+- Spacing: card `p-6` → `p-5`, list `mt-5 gap-3`.
+- Header band: `h-8 px-3` with 11 px labels.
+- Rows: `px-3 py-3`, 15 px titles, 14 px dates.
+- Bars: `h-7 rounded-md`, 11 px labels.
+- The zoom toggle is 12 px with tighter padding.
+- `StatusBadge` gained an opt-in `compact` prop (`px-2 py-0.5 text-[11px]`). Its other callers are unchanged.
+- The label-fit constants (`BAND_INSET_PX` 12, half-width 32, slot 76) were rescaled to the new inset and type size.
+
+**Why:** Compared with the design, the user said "the design is smaller" and chose to change sizes only, keeping every row bordered.
+**Files:** `frontend/src/features/schedule/{PhaseTimelinePanel,PhaseRow}.tsx`,
+`frontend/src/components/StatusBadge.tsx`, `frontend/src/index.css`.
+**Verification:**
+- `npm run build` + `npm run lint` pass (only the existing chunk warning). No backend change.
+- Playwright on `/schedule` (Riverside Villas) at every zoom level, 1440 px and 375 px:
+  - Rows are about 98 px apart (design about 96 px), and the band and bars are 28–32 px tall.
+  - The Day-view 01–23 Sep segments still end where "SEP 24" begins.
+  - No label overlaps the caption, there is no horizontal scroll and there are no console errors.
+
+**Follow-ups:** None.
+
+---
+
+## 2026-09-23 — Schedule "Construction Phases" card: aligned axis, working zoom, mockup styling (BUG-010)
+**Refs:** BUG-010, FEAT-011
+**What:**
+- `phaseTimeline.utils.ts`:
+  - New `ZoomLevel`/`ZOOM_LEVELS`.
+  - `computeTimelineRange(phases, zoom)` snaps the range outward to whole units: day, week, month, or quarter (quarters by hand, no dayjs plugin). It replaces the 5% padding, and Day zoom gets one day of air on each side.
+  - `buildTimelineTicks(range, zoom, maxLabels)` replaces `buildDateScaleTicks`. It returns one tick per unit with its position and width on the bar axis, plus `isCurrent`. Only every n-th tick keeps a label.
+  - `getPhaseBarMetrics` now counts the end date inclusively.
+- `PhaseTimelinePanel`:
+  - Zoom defaults to Month and feeds the range and ticks.
+  - A new `TimelineHeader` is a blue "PHASE / TASK" band. Its tick labels are centered in their unit and use the same border + `px-6` track geometry as the rows.
+  - A ResizeObserver measures the axis. That width sets the label budget (about 88 px per label) and skips labels that would overlap the caption or spill past the right edge.
+- `PhaseRow`:
+  - A full-width pale track with white gridlines at the labeled ticks.
+  - The segment is colored by status: brand for Completed; amber-100 with an amber-200 `percentComplete` fill for In Progress; blue-200 for Upcoming, whose label gets "(N%)" when above zero.
+  - Larger `text-brand-ink` title and slate-700 dates. The bar label has a `title` tooltip.
+  - The shared `StatusBadge` is unchanged.
+- `index.css`: scoped `.schedule-zoom-toggle` rules make a mint pill with borderless segments and a brand-filled selection. The generic SelectButton rules stay.
+
+**Why:** The user flagged the card against its original mockup. The date labels didn't line up with the bars, the zoom did nothing, and the styling had drifted. The user chose a real-date Gantt (not the mockup's left-anchored progress bars) and a working zoom.
+**Files:** `frontend/src/features/schedule/{phaseTimeline.utils.ts,PhaseTimelinePanel.tsx,PhaseRow.tsx}`,
+`frontend/src/index.css`, `docs/{BUGS,FEATURES}.md`.
+**Verification:**
+- `npm run build` + `npm run lint` pass (only the existing chunk-size warning). No backend change.
+- A scripted Playwright run of `/schedule` (Riverside Villas) clicked each zoom level at 1440 px and 375 px:
+  - No horizontal scroll and no console errors.
+  - Day view at 1440 px: the 01–23 Sep segments end exactly where the "SEP 24" unit (Ceiling) begins.
+  - Labels never overlap "PHASE / TASK". At 375 px they thin to one or two.
+  - The status colors and the mint toggle match the mockup.
+
+**Follow-ups:** The mockup's rectangular badge style wasn't applied: `StatusBadge` is shared with Task Log, Dashboard, and Team.
+
+---
+
+## 2026-09-23 — Dashboard Assigned Tasks / Recent Log cards restyle (FEAT-017)
+**Refs:** FEAT-017
+**What:** New scoped `.p-datatable.dash-table` rules in `index.css`: a `#e8e8e8`
+header band with title-case, non-wrapping labels; 13 px / 500 cells with
+`1.15rem` vertical padding; `table-layout: fixed`, with cells that truncate on one
+line; a `.dash-table__center` S.No. New `.dash-link` (blue) for links. Both panels
+became `h-full` bordered cards with a `text-xl` slate-900 title. Recent Log's
+title row is `h-9`, so both tables start at the same height. `AssignedTasksPanel`
+moved the external-link icon into its own narrow column, which aligns the icons
+the way the mockup does, and the icon link now has a per-row `aria-label`. Fixed
+column widths are sized to fit the ~500 px card content at 1440 px with the
+sidebar expanded (the dates use `0.5rem` side padding). The Task and description
+cells carry `title` tooltips.
+**Why:** The user supplied a mockup of the two dashboard cards. The style is
+scoped to the dashboard so the other tables (Task Log, Documents, Team, invoices)
+are unchanged.
+**Files:** `frontend/src/{index.css,features/dashboard/{AssignedTasksPanel,RecentLogPanel}.tsx}`,
+`docs/FEATURES.md`.
+**Verification:** `npm run build` + `npm run lint` pass (only the existing chunk
+warning); no backend change. Playwright at 1440 px: the header is `rgb(232, 232, 232)`
+and not uppercase; both tables start at the same y (±1 px); neither card scrolls
+horizontally; only the Task cell truncates (the dates are shown in full). View
+Details opens the log dialog. At 375 px the page doesn't overflow (the table
+scrolls inside its card). No console errors. Screenshots were compared with the
+mockup.
+**Follow-ups:** The link blue (`#2563eb`) follows the mockup; other pages still
+use brand-green links.
+
+---
+
+## 2026-09-23 — Sidebar redesign + collapsible icon rail (FEAT-016)
+**Refs:** FEAT-016
+**What:**
+- New `stores/uiStore.ts` (zustand + persist, `construction-ui`):
+  `sidebarCollapsed` / `toggleSidebar`.
+- New `components/SidebarLogo.tsx`: the mockup's placeholder mark, a teal hollow
+  square + "LOGO", with a `compact` (square-only) variant for the rail. Used in
+  `AppSidebar` and the `Topbar` mobile drawer. `LogoMark` is unchanged (onboarding).
+- `AppSidebar` restyled: `#f8f8f8` background, logo / project / nav sections with
+  dividers, a "< >" toggle tab (`pi-code`) on the right edge (`aria-expanded`,
+  label "Collapse/Expand sidebar"), width `w-72` ↔ `w-20`. The New Project button
+  becomes icon-only with a tooltip when collapsed. The switcher has a grey
+  "Project" chip, name, description line and a brand `pi-sort` icon, and is hidden
+  when collapsed.
+- `NavLinks` gains a `collapsed` prop: icon-only links with `aria-label` +
+  PrimeReact `Tooltip`. The look now matches the mockup (17 px, `text-xl` icons,
+  `rounded-lg`).
+- `navItems.ts`: outline icons (`pi-chart-bar`, `pi-calendar`, `pi-clipboard`,
+  `pi-dollar`, `pi-file`, `pi-users`).
+- `index.css`: `.p-button.p-component.sidebar-new-project` (6 px radius,
+  left-aligned label; the extra classes beat the global pill rule, as in BUG-009)
+  + an icon-only variant.
+**Why:** The user supplied a sidebar mockup. They chose: second line = description
+(no address field), toggle = collapse to an icon rail, logo = literal "LOGO"
+placeholder.
+**Files:** `frontend/src/{stores/uiStore.ts,components/{AppSidebar,SidebarLogo,NavLinks,Topbar}.tsx,components/navItems.ts,index.css}`, `docs/{FEATURES,ARCHITECTURE}.md`.
+**Verification:** `npm run build` + `npm run lint` pass (only the existing chunk
+warning); `dotnet build` 0/0. Playwright scratch script (17/17 PASS), at 1440 px
+on `/budget`: the sidebar is 288 px; "LOGO" is visible; New Project has a 6 px
+radius, brand fill and a left-aligned label; the switcher shows the chip, name
+and description, and switching projects works; Budget is the active link. The
+toggle makes it 80 px, with labels and switcher hidden, a tooltip on hover, and
+the icon link navigating to `/team`. The state persists across reload, and the
+toggle expands it back to 288 px. At 375 px the aside is hidden and the drawer
+shows LOGO + 6 links. No overflow, no console errors. Screenshots were compared
+with the mockup.
+**Follow-ups:** Replace the "LOGO" placeholder once a real logo exists. The
+project switcher could show an address if one is ever added to `Project`.
+
+---
+
+## 2026-09-23 — Fix Calendar trigger rendering as a filled pill (BUG-009)
+**Refs:** BUG-009, BUG-005
+**What:** In `index.css`, `.p-calendar .p-datepicker-trigger` and its `:enabled:hover`
+rule now include `.p-button` (`.p-calendar .p-button.p-datepicker-trigger`).
+**Why:** The trigger is a `.p-button`, so the global filled-button rule
+(`.p-button:not(.p-button-outlined):not(.p-button-text)`, 0,3,0; hover 0,5,0)
+beat the calendar rules (0,2,0 / 0,4,0). It made the trigger a brand-green pill,
+taller than the input. With the extra class the specificity ties, and the
+calendar block comes later, so it wins. This is the same override approach as
+the SelectButton fix (BUG-005).
+**Files:** `frontend/src/index.css`, `docs/BUGS.md`.
+**Verification:** `npm run build` + `npm run lint` pass (only the existing chunk
+warning); `dotnet build` 0/0. Playwright scratch script at 1440 px, on the Task
+Log Date Range and on the New Task dialog's date field: the trigger background
+is `rgb(255, 255, 255)`, its radius is `0 10px` (end-cap), its height equals
+the input's, and there is no gap. On Task Log, hover gives `#f8fafc`, and a click
+opens the date picker. No console errors. Screenshots confirm. The Milestone
+and Expense dialogs use the same rule and were not opened.
+**Follow-ups:** none.
+
+---
+
+## 2026-09-23 — Fix search-field double border (BUG-008); file BUG-009
+**Refs:** BUG-008, BUG-009
+**What:** New `.search-field` class in `index.css`: a bordered wrapper with a
+leading icon, the same border, radius, height and focus ring as a `Dropdown`,
+with a borderless, transparent inner `.p-inputtext`. `TaskLogToolbar` uses it
+in place of its Tailwind-styled `<span>`. `.topbar-search .p-inputtext` gains
+`border: none`. Removed the ineffective `border-0 bg-transparent p-0 shadow-none`
+utilities from both inputs and added `aria-label`s ("Filter task log", "Search").
+**Why:** BUG-008. Tailwind utilities are layered, so they can't override the
+unlayered global `.p-inputtext` border and padding. The inputs drew a box inside
+their wrappers.
+**Files:** `frontend/src/index.css`, `frontend/src/features/task-log/TaskLogToolbar.tsx`,
+`frontend/src/components/Topbar.tsx`, `docs/{BUGS,ARCHITECTURE}.md`.
+**Verification:** `npm run build` + `npm run lint` pass (only the existing chunk
+warning); `dotnet build` 0/0. Playwright scratch script at 1440 px on `/task-log`:
+both search inputs have `border-top-width: 0px`; the search field is 49 px, the
+same as the dropdowns. Focus puts the brand ring on the wrapper and none on the
+input. Typing a non-matching term still filters the table to "No tasks". At
+375 px there is no overflow, and there are no console errors. Screenshots show
+a single border.
+**Follow-ups:** BUG-009 (Calendar `showIcon` trigger picks up the filled-button
+style).
+
+---
+
+## 2026-09-23 — Fix dropdown double border (BUG-007); restore backend build; file BUG-008
+**Refs:** BUG-007, BUG-008
+**What:**
+- `index.css` Dropdown block: `.p-dropdown .p-dropdown-label` gets `border: none;
+  border-radius: 0` (the label is also a `.p-inputtext`, so the global input
+  border drew a box inside every dropdown). `.p-dropdown .p-dropdown-label:enabled:focus
+  { box-shadow: none }` stops the editable Team role `<input>` from drawing an
+  inner focus ring inside the dropdown's `.p-focus` ring. `.p-dropdown.p-invalid`
+  now sets the red border, which the unlayered `.p-dropdown` border had
+  overridden. Removed the now-redundant `.toolbar-band` label rule.
+- Reverted `Features/Budget/BudgetContracts.cs` and
+  `Features/Dashboard/DashboardContracts.cs` to their committed state, with fully
+  qualified `Construction.Application.*` types in the `From(...)` methods. This
+  fixes the build break recorded in the FEAT-015 entry below (user approved).
+**Why:** BUG-007, filed during FEAT-015. The API had to build for the browser check.
+**Files:** `frontend/src/index.css`, `backend/src/Construction.Api/Features/{Budget/BudgetContracts,Dashboard/DashboardContracts}.cs`, `docs/BUGS.md`.
+**Verification:** `npm run build` + `npm run lint` pass (only the existing
+>500 kB chunk warning); `dotnet build` 0 warnings / 0 errors. Playwright scratch
+script at 1440 px: every `.p-dropdown-label` has `border-top-width: 0px` on
+`/register` (phone field), `/task-log`, `/team` and `/onboarding`. In the
+Team invite dialog, the focused role input has `box-shadow: none` and no border,
+and the outer dropdown shows the focus ring. Submitting with the role empty turns
+the role dropdown border `rgb(220, 38, 38)`. At 375 px, `/task-log` and `/team`
+have no horizontal overflow. No console errors. Screenshots show a single border
+per dropdown. The New Task, Milestone, Expense and Upload dialogs were not
+opened; they use the same global rule.
+**Follow-ups:** BUG-008 (the Task Log search input and topbar search show an
+inner input border; same root cause).
+
+---
+
+## 2026-09-23 — Team page: project team members (FEAT-015); file BUG-007
+**Refs:** FEAT-015, BUG-007, ADR-0016
+**What:**
+- **Backend:** Domain `TeamMember` (+ `TeamMemberStatus`). `Application/Team/`:
+  `ITeamService`/`TeamService` (search, roles, export, create, update,
+  set-status; owner-scoped; `TeamMemberSaveResult` carries NotFound /
+  DuplicateEmail → 404 / 409), `ITeamMemberRepository`, DTO/commands/query.
+  `IProjectTaskRepository.CountOpenByAssigneeAsync` (open tasks per assignee,
+  case-insensitive) feeds `ActiveTaskCount`. Infrastructure:
+  `TeamMemberRepository`, `AppDbContext` mapping (unique `(ProjectId, Email)`,
+  phase FK `ClientSetNull`), migration `AddTeamMembers`. Api:
+  `Features/Team/` `TeamController` (list/roles/export/create/update/status),
+  `TeamContracts`, `TeamValidators`, `TeamCsv` (RFC-4180 + CSV-injection
+  guard + BOM). `DbSeeder` gained an idempotent `SeedTeamMembersAsync` top-up
+  (12 sample members; the first five are the seeded task assignees).
+- **Frontend:** `features/team/` (`team.api.ts`, `team.hooks.ts`,
+  `team.schema.ts`, `TeamPanel`, `TeamTable`, `TeamStatusBadge`,
+  `TeamMemberDialog` for details + deactivate/reactivate + edit,
+  `TeamMemberFormDialog` shared by invite and edit, with an editable role
+  dropdown that suggests existing roles, and a 409 message) +
+  `pages/TeamPage.tsx`. `/team` is no longer a stub. Extracted from Documents:
+  `components/pagerTemplate.tsx`, `lib/download.ts`, and the CSS renames
+  `.documents-table` → `.app-table`, `.documents-paginator__nav` →
+  `.pager-nav`, `.documents-search` → `.flat-search`. New `.toolbar-band`.
+**Why:** User supplied the Team mockup and approved the plan (invite = member
+record only; active tasks = name match; real seed data in `DbSeeder`).
+**Files:** `backend/src/Construction.{Domain/Entities/TeamMember.cs,
+Application/{Team/*,Dashboard/IProjectTaskRepository.cs,DependencyInjection.cs},
+Infrastructure/{Repositories/{TeamMemberRepository,ProjectTaskRepository}.cs,
+Persistence/AppDbContext.cs,Persistence/Migrations/*AddTeamMembers*,
+DependencyInjection.cs},Api/{Features/Team/*,Common/DbSeeder.cs}}`,
+`frontend/src/{features/team/*,pages/TeamPage.tsx,router/index.tsx,
+components/pagerTemplate.tsx,lib/download.ts,index.css,
+features/documents/{DocumentsTable,DocumentsPanel}.tsx}`, `README.md`, `docs/*`.
+**Verification:** `npm run build` + `npm run lint` pass (only the existing
+>500 kB chunk warning). `dotnet build` passed (0 warnings) after all Team
+backend changes, and the API ran from that build. The seeder's auto-migrate
+applied `AddTeamMembers`. The top-up added 12 members to each demo-user
+project, and a restart added none (13/12 unchanged). curl: list/paging (12 →
+8 + 4), `role`, `status`, `search` filters; roles endpoint; create 201;
+duplicate email in different case 409; invalid email 400; update to a taken
+email 409; status toggle 200; bad status 400; an InProgress + a Completed task
+for "grace okafor" → Grace Okafor shows 1 task; Riverside Villas shows real
+counts (Miguel 2, Dana 2, Priya 2, Sam 1, Carlos 1); export CSV has
+`Content-Disposition: attachment; filename=team-members.csv`, `'=cmd|calc`
+escaped and `"Has, comma ""quote"""` quoted; foreign project 404; no token
+401. Playwright (scratch script, 1440 + 375 px): heading uses the project
+name; 8 rows; page 2 starts at S.No 9; invite via dialog → row appears;
+duplicate email shows the 409 message; Open → Deactivate flips the badge →
+Edit saves; status filter; Export downloads `team-members.csv` with the
+filter applied; the Documents pager still renders after the refactor; no page
+overflow at 375 px; Action column fits at 1440 px. The only console error is
+the deliberate 409. Two issues found and fixed during the check: filter
+dropdowns stretched full-width (global `.p-dropdown` width beat Tailwind; now
+wrapped in sized divs) and long names pushed the Action column off-card
+(name/role now wrap).
+**Follow-ups:** BUG-007 (app-wide dropdown double border). No delete-member
+endpoint. Members aren't linked to tasks by FK (ADR-0016). Test members and
+tasks ("=cmd|calc", "Browser Probe …", "Probe InProgress/Completed") were left
+in the dev DB on project "Controller Migration Test". **At the end of this
+session `dotnet build` fails** because of an edit made outside this session at
+19:17–19:18 to `Features/Budget/BudgetContracts.cs` and
+`Features/Dashboard/DashboardContracts.cs`. It shortened
+`Construction.Application.*` parameter types to bare names, which inside the
+Api namespace resolve to the Api records themselves (CS1503/CS0411). Not
+reverted here.
+
+## 2026-09-23 — Document page: Project File Repository (FEAT-014) + S.No paging fix (BUG-006)
+**Refs:** FEAT-014, BUG-006, ADR-0015
+**What:**
+- **Backend:** new `ProjectDocument` entity + `DocumentFormat` enum and
+  `DocumentFormatResolver` (Domain). `Application/Documents/`:
+  `IDocumentService`/`DocumentService` (search, counts, upload, open; all
+  owner-scoped, null → 404), `IProjectDocumentRepository`, `IFileStorage`,
+  `DocumentUploadRules` (100 MB, extension allow-list), DTOs/commands; new
+  `Application/Common/IUserDirectory` for the uploader display name.
+  Infrastructure: `ProjectDocumentRepository`, `Storage/LocalFileStorage`
+  (+ options, path-traversal guard), `Identity/UserDirectory`, `AppDbContext`
+  mapping, migration `AddProjectDocuments`. Api: `Features/Documents/`
+  `DocumentsController` (`GET` list, `GET counts`, multipart `POST` with
+  request-size limits, `GET {id}/content[?download=true]` via `Results.File`
+  with range support), `DocumentContracts`, `UploadDocumentRequestValidator`.
+  `Program.cs` resolves `FileStorage:RootPath` against the content root;
+  `appsettings.json` gains the `FileStorage` section; `.gitignore` ignores
+  `backend/**/App_Data/`.
+- **Frontend:** `features/documents/` (`documents.api.ts`,
+  `documents.hooks.ts`, `documents.schema.ts`, `DocumentsPanel`,
+  `DocumentsTable`, `UploadDocumentDialog` with drag-drop, optional name and
+  phase, and a progress bar) + `pages/DocumentsPage.tsx`; `/documents` route
+  no longer a stub. `lib/format.ts` gains `formatFileSize`. Scoped `index.css`
+  overrides: `.documents-search` (flat field), `.documents-table` (title-case
+  headers, right-aligned "← Previous / Next →" paginator).
+- **BUG-006:** paginated S.No double-counted the page offset. Fixed in
+  `TaskLogTable`, `InvoicesPanel`, `DocumentsTable`.
+**Why:** User supplied the Document tab mockup and asked for the backend too.
+**Files:** `backend/src/Construction.{Domain/Entities/ProjectDocument.cs,
+Application/{Documents/*,Common/IUserDirectory.cs,DependencyInjection.cs},
+Infrastructure/{Repositories/ProjectDocumentRepository.cs,Storage/*,Identity/*,
+Persistence/AppDbContext.cs,Persistence/Migrations/*AddProjectDocuments*,
+DependencyInjection.cs},Api/{Features/Documents/*,Program.cs,appsettings.json}}`,
+`frontend/src/{features/documents/*,pages/DocumentsPage.tsx,router/index.tsx,
+lib/format.ts,index.css,features/task-log/TaskLogTable.tsx,
+features/budget/InvoicesPanel.tsx}`, `.gitignore`, `README.md`, `docs/*`.
+**Verification:** `dotnet build` passes (0 warnings); `npm run build` +
+`npm run lint` pass. Migration applied with `dotnet ef database update`
+(the `DbSeeder` auto-migrate call is commented out in `Program.cs`). curl:
+PDF/PNG/CSV/DOCX uploads → 201 with correct format and phase name; `.exe` →
+400 "This file type isn't supported"; no file → 400; 101 MB → 400 (body
+limit); counts, `format` filter and `search` correct; inline content bytes
+match the original; `download=true` sends `Content-Disposition: attachment`;
+foreign project → 404; no token → 401. Playwright (scratch script) at 1440 px:
+dialog upload with name + phase shows up as row 1 and "All Files" count
+updates; `.exe` rejected client-side; each tab filters correctly; search
+works; page 2 starts at S.No 9 (was 17 before the BUG-006 fix); Download
+saves `Ground_Floor_Joists.pdf`; Open loads the PNG in a new tab from a
+`blob:` URL. At 375 px there's no horizontal page overflow (the table scrolls
+inside its card). No console errors.
+**Follow-ups:** delete/rename/replace endpoints and UI; a blob-store
+`IFileStorage` for multi-instance hosting; `DbSeeder` doesn't seed documents
+(no demo files). Test uploads were left in the dev DB and `App_Data/uploads`
+for project "Controller Migration Test". README's endpoint table is still
+missing the older tasks/phases/task-log/budget routes (pre-existing gap).
+
+## 2026-09-23 — Fix PrimeReact button styling lost to Tailwind preflight (BUG-005)
+**Refs:** BUG-005, ADR-0014
+**What:** `frontend/src/index.css` now opens with
+`@layer theme, base, primereact, components, utilities;` so Tailwind preflight
+no longer overrides the Lara theme — filled buttons get white text and the
+icon/label gap back. That exposed two theme defects preflight had been
+hiding, both fixed with unlayered overrides in `index.css`: the paginator's
+active page (Lara-teal sets text = background `#0f766e`; now brand fill +
+white, 2.25rem elements) and the Schedule Day/Week/Month/Quarter
+`SelectButton` (its options matched the global filled-button rule, so every
+option was solid green with unreadable labels — pre-existing; now white
+segments with a brand-filled selection). Also `white-space: nowrap` on filled
+buttons and `flex-wrap gap-4` on the Schedule (both panels), Task Log and
+Dashboard "Assigned Tasks" headers, so at 375 px buttons drop to their own
+row instead of wrapping to two lines / clipping (pre-existing).
+**Why:** User asked to fix BUG-005 (filed earlier the same day).
+**Files:** `frontend/src/index.css`,
+`frontend/src/features/schedule/{PhaseTimelinePanel,UpcomingDeadlinesPanel}.tsx`,
+`frontend/src/features/task-log/TaskLogPanel.tsx`,
+`frontend/src/features/dashboard/AssignedTasksPanel.tsx`, `docs/DECISIONS.md`,
+`docs/BUGS.md`.
+**Verification:** Scripted Playwright before/after screenshots of 13 views
+(login, register, dashboard, schedule, task-log, budget, documents, 4
+onboarding steps, New Expense + New Task dialogs) at 1440 px and 375 px,
+pixel-diffed and reviewed: only button/paginator/toggle changes plus ≤2 px
+height shifts; no horizontal scroll, no console errors or API 4xx. Computed
+style on "New Expense": label/icon `#fff`, icon margin-right 8 px (was
+`#1f2937` / 0). `cd frontend && npm run build && npm run lint` pass;
+`cd backend && dotnet build` passes (no backend changes; alternate `-o` dir
+since the running API locks the default output).
+**Follow-ups:** None for this bug.
+
+---
+
 ## 2026-09-23 — Fix onboarding options 404 (BUG-004); browser check of /budget; file BUG-005
 **Refs:** BUG-004, BUG-005, FEAT-013
 **What:** `getOnboardingOptions()` (`frontend/src/features/onboarding/onboarding.api.ts`)

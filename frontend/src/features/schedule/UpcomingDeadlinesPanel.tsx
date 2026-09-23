@@ -25,7 +25,7 @@ export function UpcomingDeadlinesPanel({ projectId }: UpcomingDeadlinesPanelProp
 
   return (
     <div className="rounded-2xl bg-white p-6 shadow-sm">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
           <h2 className="text-lg font-bold text-brand-ink">Upcoming Deadlines</h2>
           <p className="text-sm text-slate-500">Milestone checkpoints &amp; closeouts</p>

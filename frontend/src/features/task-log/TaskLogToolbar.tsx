@@ -31,13 +31,13 @@ export function TaskLogToolbar({
 
   return (
     <div className="mt-4 flex flex-wrap items-center gap-3">
-      <span className="flex min-w-[220px] flex-1 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2">
+      <span className="search-field min-w-[220px] flex-1">
         <i className="pi pi-search text-slate-400" />
         <InputText
           value={search}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Filter task titles, contractors..."
-          className="w-full border-0 bg-transparent p-0 shadow-none"
+          aria-label="Filter task log"
         />
       </span>
 

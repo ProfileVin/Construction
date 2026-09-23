@@ -172,8 +172,30 @@ Config: `appsettings.json` — `ConnectionStrings:Default` (LocalDB), `Jwt:*`
 **Frontend:**
 - **New API call:** add a typed function in a `features/<x>/<x>.api.ts` using the
   shared `api` client; wrap in a `useQuery`/`useMutation` hook in the same folder.
+- **File upload / download (FEAT-014, ADR-0015):** the shared client defaults to
+  `Content-Type: application/json`, so a `FormData` POST **must** pass
+  `headers: { 'Content-Type': 'multipart/form-data' }`. Otherwise axios
+  JSON-serializes the form. Authed file endpoints can't be plain `<a href>`s:
+  fetch with `responseType: 'blob'` and open or download via an object URL
+  (`lib/download.ts` `downloadBlob(blob, fileName)`; used by Documents and the
+  Team CSV export). Backend file bytes go through
+  `IFileStorage` (`FileStorage:RootPath`), never direct `File.*` calls in
+  services.
+- **Paginated DataTable S.No:** use `opts.rowIndex + 1`. PrimeReact's
+  `rowIndex` already includes the paginator offset (BUG-006).
+- **List-page table look (Documents, Team):** `className="app-table"` on a lazy
+  `DataTable` + `paginatorTemplate={pagerTemplate}` from
+  `components/pagerTemplate.tsx` ("← Previous 1 2 Next →", `.pager-nav`). Flat
+  search field = `.flat-search`; a light-blue filter strip = `.toolbar-band`.
+  Size PrimeReact `Dropdown`s with a wrapper `div` (`w-full sm:w-48`), because
+  the unlayered global `.p-dropdown { width: 100% }` beats Tailwind width utilities.
+  For the same reason, Tailwind `border-0`/`p-0` can't strip a `.p-inputtext`.
+  For a bordered search box with an icon, use `.search-field` on the wrapper
+  (Dropdown-sized; the wrapper owns the border and focus ring) (BUG-008).
 - **Auth state:** read via `useAuthStore(selector)`; never store the token
   elsewhere. Gate routes with `<ProtectedRoute>`.
+- **UI preferences** (e.g. sidebar collapsed): `stores/uiStore.ts` (zustand +
+  persist, `construction-ui`). The selected project lives in `stores/projectStore.ts`.
 - **Forms:** React Hook Form + `zodResolver(<schema>)`; wrap every PrimeReact
   input in `<Controller>`; surface field errors as `<small>` and request-level
   errors from the mutation via a `getXErrorMessage(error)` helper. For live field

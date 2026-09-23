@@ -48,7 +48,7 @@ export function InvoicesPanel({ projectId, currencyCode }: InvoicesPanelProps) {
         >
           <Column
             header="S.No"
-            body={(_row: Invoice, opts) => (page - 1) * PAGE_SIZE + opts.rowIndex + 1}
+            body={(_row: Invoice, opts) => opts.rowIndex + 1} // rowIndex already includes the page offset (BUG-006)
             style={{ width: '4rem' }}
           />
           <Column

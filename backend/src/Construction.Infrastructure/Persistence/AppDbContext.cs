@@ -16,6 +16,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
 
+    public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
+
+    public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
+
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
 
     public DbSet<LookupOption> LookupOptions => Set<LookupOption>();
@@ -103,6 +107,47 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             entity.HasOne<BudgetCategory>()
                 .WithMany()
                 .HasForeignKey(i => i.CategoryId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        builder.Entity<ProjectDocument>(entity =>
+        {
+            entity.Property(d => d.Name).HasMaxLength(260).IsRequired();
+            entity.Property(d => d.OriginalFileName).HasMaxLength(260).IsRequired();
+            entity.Property(d => d.ContentType).HasMaxLength(200).IsRequired();
+            entity.Property(d => d.Extension).HasMaxLength(20);
+            entity.Property(d => d.Format).HasConversion<string>().HasMaxLength(40);
+            entity.Property(d => d.StorageKey).HasMaxLength(300).IsRequired();
+            entity.Property(d => d.UploadedByUserId).HasMaxLength(450).IsRequired();
+            entity.Property(d => d.UploadedByName).HasMaxLength(200).IsRequired();
+            entity.HasIndex(d => d.ProjectId);
+            entity.HasIndex(d => d.PhaseId);
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(d => d.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ConstructionPhase>()
+                .WithMany()
+                .HasForeignKey(d => d.PhaseId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        builder.Entity<TeamMember>(entity =>
+        {
+            entity.Property(m => m.FullName).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.RoleTitle).HasMaxLength(200).IsRequired();
+            entity.Property(m => m.Specialty).HasMaxLength(200);
+            entity.Property(m => m.Email).HasMaxLength(256).IsRequired();
+            entity.Property(m => m.Status).HasConversion<string>().HasMaxLength(40);
+            entity.HasIndex(m => new { m.ProjectId, m.Email }).IsUnique();
+            entity.HasIndex(m => m.PhaseId);
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(m => m.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ConstructionPhase>()
+                .WithMany()
+                .HasForeignKey(m => m.PhaseId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
         });
 

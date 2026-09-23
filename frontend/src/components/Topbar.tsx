@@ -5,9 +5,9 @@ import type { MenuItem } from 'primereact/menuitem'
 import { Sidebar } from 'primereact/sidebar'
 import { useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
-import { LogoMark } from './LogoMark'
 import { NavLinks } from './NavLinks'
 import { NAV_ITEMS } from './navItems'
+import { SidebarLogo } from './SidebarLogo'
 import { useSelectedProject } from '../features/dashboard/dashboard.hooks'
 import { useAuthStore } from '../stores/authStore'
 
@@ -65,7 +65,7 @@ export function Topbar() {
       <div className="flex items-center gap-2 sm:gap-4">
         <span className="topbar-search hidden items-center gap-2 sm:flex">
           <i className="pi pi-search text-slate-400" />
-          <InputText placeholder="Search ..." className="border-0 bg-transparent p-0 shadow-none" />
+          <InputText placeholder="Search ..." aria-label="Search" />
         </span>
 
         <button
@@ -89,7 +89,7 @@ export function Topbar() {
 
       <Sidebar visible={drawerOpen} onHide={() => setDrawerOpen(false)} className="w-72">
         <div className="flex flex-col gap-6">
-          <LogoMark />
+          <SidebarLogo />
           <NavLinks onNavigate={() => setDrawerOpen(false)} />
         </div>
       </Sidebar>
