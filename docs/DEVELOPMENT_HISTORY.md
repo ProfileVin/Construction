@@ -17,6 +17,107 @@ Entry template:
 
 ---
 
+## 2026-09-23 — Fix onboarding options 404 (BUG-004); browser check of /budget; file BUG-005
+**Refs:** BUG-004, BUG-005, FEAT-013
+**What:** `getOnboardingOptions()` (`frontend/src/features/onboarding/onboarding.api.ts`)
+now calls `GET /api/reference/options` instead of the never-mapped
+`/api/onboarding/options` — the same fix pattern as BUG-003; the reference
+response is a superset of `OnboardingOptions`, so no client-side reshaping.
+README endpoint table: replaced the phantom `/api/onboarding/options` and
+`/api/projects/options` rows with the real `/api/reference/options`. Also did
+the FEAT-013 follow-up browser check of `/budget`, which surfaced BUG-005
+(app-wide PrimeReact button text/icon styling lost to Tailwind preflight
+because of CSS layer order) — filed, not fixed.
+**Why:** BUG-004 broke the very first onboarding step; FEAT-013's history entry
+asked for a real-browser check of `/budget`.
+**Files:** `frontend/src/features/onboarding/onboarding.api.ts`, `README.md`,
+`docs/BUGS.md`.
+**Verification:** Playwright (headless Chromium, scripted — the MCP browser
+bridge wasn't connected) logged in as the demo user: `/onboarding` and
+`/onboarding/company` at 1440 px and 375 px — all four dropdowns populated
+(timezone auto-detected), zero console errors / API 4xx (previously a 404 on
+`/api/onboarding/options`). `/budget` at 1440 px and 375 px — renders, no
+horizontal page scroll (invoice table scrolls within its card on mobile), no
+console errors. `cd frontend && npm run build && npm run lint` pass (only the
+pre-existing >500 kB chunk warning); `cd backend && dotnet build` passes (built
+to an alternate `-o` dir because the running API locked the default output).
+**Follow-ups:** BUG-005. `/budget` was only seen in its empty state — the
+demo user's active project predates the budget seed data, so the populated
+category bars / invoice rows still haven't been viewed in a browser.
+
+---
+
+## 2026-09-23 — Budget & Finance page: category breakdown + invoices (FEAT-013)
+**Refs:** FEAT-013
+**What:** Built the `/budget` page end-to-end, replacing its `ComingSoonPage`
+stub, from a user-supplied mockup. Backend: new `BudgetCategory`
+(`Construction.Domain/Entities/BudgetCategory.cs` — name, allocated/spent
+amounts, `IsContingency` bool) and `Invoice` (`InvoiceStatus` enum,
+vendor, category FK, amount, issued date) entities + migration
+`AddBudgetCategoriesAndInvoices`. New `Construction.Application/Budget/`
+(`IBudgetService`/`BudgetService`) and `Construction.Api/Features/Budget/`
+(`BudgetController`: `GET /summary`, `GET/POST /invoices`), following the
+same Clean Architecture pilot pattern and `Features/<Area>/` convention as
+FEAT-011/012. Reused FEAT-012's generic `PagedResult<T>`/`PagedResponse<T>`
+for the invoices list rather than inventing a second pagination shape.
+Added `IProjectRepository.GetForOwnerAsync` (`ProjectRepository.cs`) — the
+first single-project fetch method; previously only `ListByOwnerAsync`/
+`ExistsForOwnerAsync` existed, but the summary needs `Project.BudgetTotal`/
+`TotalSpent` for the three top stat cards. **Derived-metric definitions**
+(user confirmed "reasonable approximations", no PO subsystem): Committed
+POs = sum of Pending invoices; Unbilled Work =
+`max(0, sum(category.SpentAmount) - sum(invoice.Amount))`; Contingency
+Burn % = spend/allocated on the one category flagged `IsContingency`,
+labeled Healthy (≤50%) / Watch (≤80%) / At Risk (>80%). Frontend: new
+`frontend/src/features/budget/` (`budget.api.ts`/`.hooks.ts`/`.schema.ts`,
+`CategoryProgressRow`/`CategoryBreakdownPanel` — single percent-width bars,
+5-color fixed palette, no shared-timeline math needed unlike Schedule's
+Gantt bars — `InvoicesPanel` reusing `TaskLogTable`'s `paginator`/`lazy`
+pattern, `NewExpenseDialog`). Extended `BudgetSummaryCard.tsx` (shared with
+Dashboard) with an optional `badge` prop for the Remaining Balance card's
+Positive/Over Budget pill — existing Dashboard usages unaffected since it's
+optional. "Open Details" on the three stat cards scrolls to the category
+panel (`scrollIntoView`) rather than being a dead click, since there's
+nowhere else on this page for them to navigate to.
+**Why:** User-requested feature, same mockup-driven full-stack approach as
+FEAT-011/012 in the same session (resumed after a ~week gap — session
+picked back up on 2026-09-23). User explicitly confirmed full-stack and the
+derived-metric approximations before implementation, since neither is
+obviously derivable from the mockup alone (no purchase-order concept exists
+anywhere in this app).
+**Files:** `backend/src/Construction.Domain/Entities/{BudgetCategory,Invoice}.cs`
+(new); `backend/src/Construction.Infrastructure/Persistence/AppDbContext.cs`,
+`Repositories/{BudgetCategoryRepository,InvoiceRepository,ProjectRepository}.cs`;
+`backend/src/Construction.Application/Budget/*` (new),
+`Projects/IProjectRepository.cs`; `backend/src/Construction.Api/Features/Budget/*`
+(new), `Common/{PagedResponse.cs,DbSeeder.cs}`; migration
+`Persistence/Migrations/20260915140937_AddBudgetCategoriesAndInvoices.cs`;
+`frontend/src/features/budget/*` (new),
+`frontend/src/features/dashboard/BudgetSummaryCard.tsx`,
+`frontend/src/pages/BudgetPage.tsx` (new), `frontend/src/router/index.tsx`.
+**Verification:** `cd backend && dotnet build` — 0 warnings/errors.
+`cd frontend && npm run build && npm run lint` — clean. **Migration FK
+lesson from FEAT-011 applied proactively this time**: `Invoice.CategoryId →
+BudgetCategory` used `DeleteBehavior.ClientSetNull` from the start (both
+`BudgetCategories` and `Invoices` cascade-delete from `Projects`, so a
+DB-level `SET NULL` would hit the same "multiple cascade paths" SQL Server
+error already fixed once — confirmed the generated migration has no
+`onDelete` param on that FK, i.e. `NoAction` at the DB level). Live API
+smoke test hit a snag: a `Construction.Api.exe` process left running from
+before this session's ~week-long gap was serving requests against a
+pre-migration database (`Invalid object name 'BudgetCategories'`/`'Invoices'`)
+— not a code bug, just a stale process; the user is restarting it, full
+summary/invoices verification pending that. Did not visually verify the
+page in a browser — no Playwright browser extension available in this
+environment, same limitation as FEAT-011/012.
+**Follow-ups:** No "add category" UI — categories are seed-only this pass
+(`BudgetService.CreateCategoryAsync` exists but isn't wrapped in a
+controller endpoint). Someone should open `/budget` in a real browser to
+confirm layout, once the stale dev-server process is cycled and the live
+smoke test completes.
+
+---
+
 ## 2026-09-14 — Task Log page: filterable, paginated task table (FEAT-012)
 **Refs:** FEAT-012
 **What:** Built the `/task-log` page end-to-end, replacing its `ComingSoonPage`

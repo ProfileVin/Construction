@@ -8,6 +8,7 @@ import { OnboardingCompanyPage } from '../features/onboarding/OnboardingCompanyP
 import { OnboardingPreferencesPage } from '../features/onboarding/OnboardingPreferencesPage'
 import { OnboardingProjectPage } from '../features/onboarding/OnboardingProjectPage'
 import { OnboardingStartPage } from '../features/onboarding/OnboardingStartPage'
+import { BudgetPage } from '../pages/BudgetPage'
 import { DashboardPage } from '../pages/DashboardPage'
 import { SchedulePage } from '../pages/SchedulePage'
 import { TaskLogPage } from '../pages/TaskLogPage'
@@ -63,7 +64,7 @@ export const router = createBrowserRouter([
       { path: '/', element: <DashboardPage /> },
       { path: '/schedule', element: <SchedulePage /> },
       { path: '/task-log', element: <TaskLogPage /> },
-      { path: '/budget', element: <ComingSoonPage title="Budget & Finance" /> },
+      { path: '/budget', element: <BudgetPage /> },
       { path: '/documents', element: <ComingSoonPage title="Document" /> },
       { path: '/team', element: <ComingSoonPage title="Team" /> },
     ],

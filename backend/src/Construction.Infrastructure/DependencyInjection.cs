@@ -1,3 +1,4 @@
+using Construction.Application.Budget;
 using Construction.Application.Common;
 using Construction.Application.Dashboard;
 using Construction.Application.Projects;
@@ -22,6 +23,8 @@ public static class DependencyInjection
         services.AddScoped<IProjectTaskRepository, ProjectTaskRepository>();
         services.AddScoped<IConstructionPhaseRepository, ConstructionPhaseRepository>();
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
+        services.AddScoped<IBudgetCategoryRepository, BudgetCategoryRepository>();
+        services.AddScoped<IInvoiceRepository, InvoiceRepository>();
 
         return services;
     }

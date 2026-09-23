@@ -1,3 +1,4 @@
+using Construction.Application.Budget;
 using Construction.Application.Dashboard;
 using Construction.Application.Projects;
 using Construction.Application.Schedule;
@@ -15,6 +16,7 @@ public static class DependencyInjection
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IScheduleService, ScheduleService>();
         services.AddScoped<ITaskLogService, TaskLogService>();
+        services.AddScoped<IBudgetService, BudgetService>();
 
         return services;
     }
