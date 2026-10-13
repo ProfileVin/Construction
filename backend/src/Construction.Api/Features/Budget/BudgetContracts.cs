@@ -2,12 +2,30 @@ using Construction.Domain.Entities;
 
 namespace Construction.Api.Features.Budget;
 
-public record CreateInvoiceRequest(
-    string VendorName,
-    Guid? CategoryId,
-    decimal Amount,
-    InvoiceStatus Status,
-    DateOnly IssuedDate);
+/// <summary>
+/// "Record New Expense", sent as multipart/form-data so a receipt can ride along. Strings are nullable so
+/// MVC's implicit [Required] doesn't pre-empt CreateInvoiceRequestValidator's messages.
+/// </summary>
+public class CreateInvoiceRequest
+{
+    /// <summary>The "Expense / Invoice Title" (shown under the invoice number).</summary>
+    public string? VendorName { get; set; }
+
+    public Guid? CategoryId { get; set; }
+
+    public decimal Amount { get; set; }
+
+    public InvoiceStatus Status { get; set; } = InvoiceStatus.Pending;
+
+    public DateOnly IssuedDate { get; set; }
+
+    /// <summary>Optional; replaces the generated INV-{year}-{seq} number.</summary>
+    public string? ReferenceNumber { get; set; }
+
+    public string? Notes { get; set; }
+
+    public IFormFile? Receipt { get; set; }
+}
 
 public record CategoryDto(
     Guid Id,
@@ -32,11 +50,13 @@ public record InvoiceDto(
     decimal Amount,
     InvoiceStatus Status,
     DateOnly IssuedDate,
-    DateTime CreatedAt)
+    DateTime CreatedAt,
+    string? Notes,
+    Guid? ReceiptDocumentId)
 {
     public static InvoiceDto From(Construction.Application.Budget.InvoiceDto i) => new(
         i.Id, i.ProjectId, i.InvoiceNumber, i.VendorName, i.CategoryId, i.CategoryName,
-        i.Amount, i.Status, i.IssuedDate, i.CreatedAt);
+        i.Amount, i.Status, i.IssuedDate, i.CreatedAt, i.Notes, i.ReceiptDocumentId);
 }
 
 public record BudgetSummaryResponse(

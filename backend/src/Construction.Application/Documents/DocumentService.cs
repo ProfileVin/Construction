@@ -62,8 +62,7 @@ public class DocumentService(
         var phaseId = command.PhaseId is { } requested && phaseNames.ContainsKey(requested) ? requested : (Guid?)null;
 
         var documentId = Guid.NewGuid();
-        var extension = Path.GetExtension(command.FileName).ToLowerInvariant();
-        var storageKey = $"{projectId:N}/{documentId:N}{extension}";
+        var storageKey = DocumentUploadRules.StorageKeyFor(projectId, documentId, command.FileName);
         var uploadedByName = await userDirectory.GetDisplayNameAsync(ownerId, cancellationToken) ?? "Unknown";
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
 

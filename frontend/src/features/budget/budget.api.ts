@@ -1,6 +1,6 @@
 import { api } from '../../lib/api'
 
-export type InvoiceStatus = 'Pending' | 'Paid'
+export type InvoiceStatus = 'Pending' | 'Paid' | 'Scheduled'
 
 export interface BudgetCategory {
   id: string
@@ -23,6 +23,9 @@ export interface Invoice {
   status: InvoiceStatus
   issuedDate: string
   createdAt: string
+  notes: string | null
+  /** The receipt / supporting voucher, stored as a project document. */
+  receiptDocumentId: string | null
 }
 
 export interface BudgetSummary {
@@ -44,11 +47,17 @@ export interface PagedInvoices {
 }
 
 export interface CreateInvoicePayload {
+  /** The "Expense / Invoice Title" — shown under the invoice number. */
   vendorName: string
   categoryId: string | null
   amount: number
   status: InvoiceStatus
+  /** YYYY-MM-DD */
   issuedDate: string
+  /** Replaces the generated INV-{year}-{seq} number when given. */
+  referenceNumber?: string
+  notes?: string
+  receipt?: File
 }
 
 export async function getBudgetSummary(projectId: string): Promise<BudgetSummary> {
@@ -65,6 +74,19 @@ export async function searchInvoices(
 }
 
 export async function createInvoice(projectId: string, payload: CreateInvoicePayload): Promise<Invoice> {
-  const { data } = await api.post<Invoice>(`/projects/${projectId}/budget/invoices`, payload)
+  const form = new FormData()
+  form.append('vendorName', payload.vendorName)
+  if (payload.categoryId) form.append('categoryId', payload.categoryId)
+  form.append('amount', String(payload.amount))
+  form.append('status', payload.status)
+  form.append('issuedDate', payload.issuedDate)
+  if (payload.referenceNumber) form.append('referenceNumber', payload.referenceNumber)
+  if (payload.notes) form.append('notes', payload.notes)
+  if (payload.receipt) form.append('receipt', payload.receipt)
+
+  // The shared client defaults to JSON, which would make axios serialize the FormData — override it.
+  const { data } = await api.post<Invoice>(`/projects/${projectId}/budget/invoices`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
 }

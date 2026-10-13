@@ -12,9 +12,11 @@ public record InvoiceDto(
     decimal Amount,
     InvoiceStatus Status,
     DateOnly IssuedDate,
-    DateTime CreatedAt)
+    DateTime CreatedAt,
+    string? Notes,
+    Guid? ReceiptDocumentId)
 {
     public static InvoiceDto From(Invoice i, string? categoryName) => new(
         i.Id, i.ProjectId, i.InvoiceNumber, i.VendorName, i.CategoryId, categoryName,
-        i.Amount, i.Status, i.IssuedDate, i.CreatedAt);
+        i.Amount, i.Status, i.IssuedDate, i.CreatedAt, i.Notes, i.ReceiptDocumentId);
 }

@@ -17,6 +17,278 @@ Entry template:
 
 ---
 
+## 2026-10-13 — Compact "Record New Expense" modal (BUG-013)
+**Refs:** BUG-013, FEAT-023
+**What:**
+- New `.form-dialog--compact` modifier in `index.css`: tighter header/content padding, 0.45rem/13.5px inputs and dropdown, a smaller drop zone and tile, and 2.4rem action buttons. The `.expense-status-toggle` buttons are smaller too (0.35rem padding, 14px, 3px track).
+- `NewExpenseDialog`: uses the modifier, 13px labels, `gap-2.5` between fields and `gap-1` within them, a 2-row notes field, `mt-1` actions.
+- `AttachmentDropZone` gains an optional `compact` prop (13px label, `gap-1`). The other callers are unchanged.
+**Why:** The user reported the modal's fields were too large and the content scrolled on desktop (about 980px of content against PrimeReact's 90%-of-viewport cap). The user chose to keep a single column rather than pairing fields.
+**Files:** `frontend/src/index.css`, `frontend/src/features/budget/NewExpenseDialog.tsx`,
+`frontend/src/components/AttachmentDropZone.tsx`, `docs/{BUGS,FEATURES,ARCHITECTURE}.md`
+**Verification:**
+- `npm run build` + `npm run lint` pass; `dotnet build` passes.
+- playwright-cli against the running dev servers: the dialog is 715px and `.p-dialog-content` has no overflow at 1440×900 or 1366×800. At 1440×900 with the empty-save validation errors shown, it's still no overflow (785px).
+- 1280×720 and 375×812 scroll vertically as expected, with no horizontal scroll. On a phone the status buttons stay on one row.
+- New Task dialog inputs still use the 0.7rem padding (unchanged).
+**Follow-ups:** None. Could apply `form-dialog--compact` to New Log if it gets the same complaint.
+
+## 2026-10-13 — "Record New Expense" modal redesign (FEAT-023)
+**Refs:** FEAT-023, ADR-0022 (builds on FEAT-013)
+**What:**
+- **Backend:**
+  - `InvoiceStatus.Scheduled`.
+  - `Invoice.Notes` + `ReceiptDocumentId` (FK → `ProjectDocuments`, Restrict). Migration `AddInvoiceNotesAndReceipt`.
+  - `CreateInvoiceCommand` gains `ReferenceNumber`/`Notes`/`Receipt`.
+  - `BudgetService.CreateInvoiceAsync` uses the reference as the invoice number when given, and stores the receipt.
+  - Committed POs = Pending + Scheduled.
+  - New shared `Application/Documents/AttachmentUploader`: `BuildAsync`/`SaveWithAsync`, lifted out of `DashboardService`, which now uses it too.
+  - `POST …/budget/invoices` is now multipart, with a size limit. `CreateInvoiceRequest` is a nullable-string class, and the validator messages are updated ("Title is required.", "Billing date is required.").
+  - The DTOs expose `notes`/`receiptDocumentId`.
+  - `.http` sample + README row added.
+- **Frontend:**
+  - `NewExpenseDialog` rewritten as "Record New Expense": `form-dialog` look, 38rem wide, the mockup's fields, a `$ ` decimal amount, a `dd/mm/yy` calendar, and a `SelectButton` with the new `.expense-status-toggle` CSS (full-width mint track, teal border, brand-filled active segment, regular weight). Notes and the receipt use the shared `AttachmentDropZone`, which gained a `hint` prop. Buttons: Cancel / Record Expense.
+  - `createInvoice` sends FormData.
+  - `useCreateInvoice` also refreshes the documents queries.
+  - Schema: title/categoryId/amount/referenceNumber/billingDate/status/notes/receipt. The category is required only when the project has categories.
+  - Scheduled badge (amber) in `InvoicesPanel`.
+**Why:** The user supplied the Budget & Finance "Record New Expense" mockup. They chose: title = vendor line, reference # overrides the generated number, Scheduled counts toward Committed POs.
+**Files:** `backend/src/Construction.Domain/Entities/Invoice.cs`,
+`backend/src/Construction.Application/{Budget/{BudgetService,CreateInvoiceCommand,InvoiceDto}.cs,Documents/AttachmentUploader.cs,Dashboard/DashboardService.cs,DependencyInjection.cs}`,
+`backend/src/Construction.Infrastructure/Persistence/{AppDbContext.cs,Migrations/*AddInvoiceNotesAndReceipt*}`,
+`backend/src/Construction.Api/Features/Budget/{BudgetController,BudgetContracts,CreateInvoiceRequestValidator}.cs`,
+`backend/src/Construction.Api/Construction.Api.http`, `README.md`,
+`frontend/src/features/budget/{NewExpenseDialog.tsx,InvoicesPanel.tsx,budget.api.ts,budget.hooks.ts,budget.schema.ts}`,
+`frontend/src/components/AttachmentDropZone.tsx`, `frontend/src/index.css`.
+**Verification:** `dotnet build` passes (0 warnings). `npm run build` + oxlint pass.
+- **curl:**
+  - Multipart with `#CURL-001`, a Scheduled status and a PNG receipt returned 201 with that number, `notes` and `receiptDocumentId`.
+  - No reference returned `INV-2026-003`.
+  - Committed POs went 3111 → 4361.5; a Paid invoice wasn't counted.
+  - An empty body returned 400 with Title / Amount / Billing date errors.
+- **Playwright** (standalone script), `/budget` at 1440 px:
+  - The modal matches the mockup.
+  - An empty save shows the Title / Amount / Billing date errors.
+  - Filling every field, picking Scheduled and attaching a PNG, then Record Expense, put a first row of "#PW-0042 · Playwright Steel Supply · $2,500.75 · Scheduled". Committed POs went $0.00 → $2,500.75.
+  - The receipt is listed on `/documents`.
+- At 375 px there is no horizontal scroll and the three status segments stay on one row.
+- Neither demo project has budget categories, so the category-required path wasn't exercised live.
+**Follow-ups:** The invoice details dialog doesn't show notes or open the receipt yet. Test data left in dev:
+- "Riverside Villas": invoices `#CURL-001`, `INV-2026-003`.
+- "Controller Migration Test": invoice `#PW-0042`.
+- Plus their `pixel.png` receipts.
+
+## 2026-10-13 — Task Log "New Log" modal (FEAT-022)
+**Refs:** FEAT-022, ADR-0021 (builds on FEAT-012, FEAT-018, FEAT-019)
+**What:**
+- **Backend:**
+  - `ActivityLogEntry` gains nullable `AssigneeName` (200), `Category` (40) and `AttachmentDocumentId` (FK → `ProjectDocuments`, Restrict). Migration `AddActivityLogDetails`.
+  - New `CreateActivityLogCommand` + `ActivityLogCategories.All` (the six trade tags).
+  - `DashboardService.CreateActivityLogAsync` checks the project owner and that the task is in the project, stores the attachment as a `ProjectDocument` under the task's phase, and adds a numbered entry.
+  - The attachment code in `CreateTaskAsync` was extracted into `BuildAttachmentAsync` / `SaveWithAttachmentAsync`. `AddLogEntryAsync` takes the optional fields and returns the entry.
+  - DTO: `assigneeName` = the entry's own, else the task's; new `category` and `attachmentDocumentId`.
+  - New `POST /api/projects/{id}/activity-log` (multipart) + `CreateActivityLogRequestValidator`. `.http` sample and README row added.
+- **Frontend:**
+  - New `features/task-log/NewLogDialog.tsx` (`form-dialog` look): task dropdown (filterable, phase subtitle, pre-fills the assignee), `.log-chip` single-select chips, `AssigneeDropdown` (new `placeholder` prop), Log Note, attachment, Cancel / Create Log.
+  - `TaskLogPanel` uses it and shows a success `Toast` ("LOG-2026-016 created").
+  - New shared `components/AttachmentDropZone.tsx`, extracted from `NewTaskDialog`, which now uses it with no visible change.
+  - `createActivityLog` + `useCreateActivityLog`, which invalidates the Recent Log and the documents queries. `createLogSchema` + `logCategoryOptions`.
+  - `LogDetailsDialog` shows the trade tag next to the phase and an "Open attachment" link.
+**Why:** The user supplied the Task Log "New Log" mockup. They chose: a log is an entry on an existing task (the mockup has no deadline, so it can't be a task), and the chips are fixed trade tags.
+**Files:** `backend/src/Construction.Domain/Entities/ActivityLogEntry.cs`,
+`backend/src/Construction.Application/Dashboard/{CreateActivityLogCommand,ActivityLogEntryDto,IDashboardService,DashboardService}.cs`,
+`backend/src/Construction.Infrastructure/Persistence/{AppDbContext.cs,Migrations/*AddActivityLogDetails*}`,
+`backend/src/Construction.Api/Features/Dashboard/{DashboardController,DashboardContracts,CreateActivityLogRequestValidator}.cs`,
+`backend/src/Construction.Api/Construction.Api.http`, `README.md`,
+`frontend/src/components/AttachmentDropZone.tsx`,
+`frontend/src/features/task-log/{NewLogDialog,TaskLogPanel}.tsx`,
+`frontend/src/features/dashboard/{NewTaskDialog,LogDetailsDialog,AssigneeDropdown}.tsx`,
+`frontend/src/features/dashboard/dashboard.{api,hooks,schema}.ts`, `frontend/src/index.css`.
+**Verification:** `dotnet build` passes (0 warnings). `npm run build` + `npm run lint` pass. The API was restarted, and the migration applied on startup.
+- **curl:**
+  - A valid multipart request with a PNG returned 201 with `LOG-2026-015`, `category: Structural`, the entry's own assignee and an `attachmentDocumentId`.
+  - An empty request with an unknown category returned 400 with per-field errors (TaskId, Category, AssigneeName, Note).
+  - An unknown task id returned 404.
+- **Playwright** (standalone `playwright-core` script), `/task-log` at 1440 px:
+  - The modal matches the mockup. All six chips sit on one row once the chip padding was tightened and the dialog widened to 38rem.
+  - Framing is preselected.
+  - Saving the empty form shows the 3 required errors.
+  - Picking a task pre-fills its assignee.
+  - Structural toggles on.
+  - Note + PNG → Create Log shows the toast "LOG-2026-016 created — Logged on …", and reopening shows a reset form.
+  - Dashboard Recent Log → View Details shows the note, the "Structural" tag, the assignee and "Open attachment".
+  - `/documents` lists the file.
+  - "Assign New Task" looks the same after the drop-zone extraction.
+  - At 375 px there is no horizontal scroll and the chips wrap.
+**Follow-ups:** There is no list or filter of logs on the Task Log page. A log doesn't move the task's status. Test data left in dev on "Controller Migration Test": log entries `LOG-2026-015`/`016` and two `pixel.png` documents.
+
+## 2026-10-13 — "Assign New Milestone" modal redesign (FEAT-021)
+**Refs:** FEAT-021, FEAT-011, ADR-0020
+**What:**
+- Rewrote `NewMilestoneDialog` to match the mockup, using the shared `.form-dialog` look from "Assign New Task": header "Assign New Milestone" with a divider, then Milestone / Phase Title ("Enter details"), Construction Phase dropdown ("Select a phase"), and Deadline with Start date + Completion date calendars side by side from `sm` (stacked on phones; the completion `minDate` is the start date). Equal full-width Cancel/Save. Cancel / ✕ resets the form, and closing is blocked while saving. Server validation messages are shown in the error alert.
+- `schedule.schema.ts`: new `constructionPhaseOptions` (11 standard phases), `createPhaseSchema` is now title/phase/startDate/endDate, and new `derivePhaseStatus`. Removed the unused `phaseStatusOptions`.
+- Payload mapping: phase → `name` (row heading), title → `checkpointLabel` (bar label), status/percent derived from the dates. Frontend only.
+**Why:** The user supplied the Schedule-page mockup for the "+ New Milestone" modal. They chose the phase-list mapping and date-derived status (ADR-0020).
+**Files:** `frontend/src/features/schedule/{NewMilestoneDialog.tsx,schedule.schema.ts}`, `docs/{FEATURES,DECISIONS,DEVELOPMENT_HISTORY}.md`.
+**Verification:** `npm run build` + `npm run lint` pass (fixed one oxlint `incompatible-library` warning by using `useWatch` instead of `watch`); `dotnet build` passes (0 warnings). Live Playwright run (standalone `playwright-core` script; the MCP browser bridge wasn't connected), demo user, `/schedule`:
+- At 1440 px the modal matches the mockup.
+- Save on the empty form shows all 4 required errors.
+- A completion date typed before the start date is rejected by `minDate`, so the save is blocked.
+- Cancel resets the form.
+- "Roofing" from today+7 to today+30 created a row "Roofing · Upcoming", with the title on the bar.
+- "Exterior Envelope" from today−3 to today+12 created a row "0% In Progress".
+- At 375 px there is no horizontal scroll and the dates stack.
+**Follow-ups:** Milestone edit (status/percent/dates) doesn't exist yet. Two QA milestones ("QA Upcoming Milestone", "QA Current Milestone") were left on the demo user's "Controller Migration Test" project; they are harmless in dev.
+
+## 2026-09-25 — Edit task flow (FEAT-020)
+**Refs:** FEAT-020, ADR-0019 (FEAT-018 follow-up)
+**What:**
+- **Backend:**
+  - `ProjectTask.Update(title, assignee, deadline, phaseId, status, now)`, which `Create` now calls.
+  - `IProjectTaskRepository.GetAsync`.
+  - New `UpdateProjectTaskCommand` + `TaskUpdateResult` (`Updated | NotFound | DeadlineBeforeAssigned`).
+  - `DashboardService.UpdateTaskAsync`: an unknown phase id is saved as `null`, and a status change adds a `Task "…" marked <Status>` log row. The log-number code moved into a private `AddLogEntryAsync` that create also uses.
+  - New `PUT /api/projects/{id}/tasks/{taskId}` (JSON) + `UpdateProjectTaskRequestValidator`. The deadline error returns the usual `errors.deadline` shape.
+  - `.http` sample added.
+- **Frontend:**
+  - `updateProjectTask` + `useUpdateProjectTask`. Both task mutations share `invalidateTaskQueries`.
+  - `editTaskSchema` (no "not in the past" rule).
+  - New `AssigneeDropdown` (moved out of `NewTaskDialog`; `currentName` keeps a non-member's saved assignee).
+  - New `EditTaskDialog`: Task Details, Assigned To, Deadline (min = assigned date), Phase + Status side by side from `sm`. Save stays disabled until something changes.
+  - `TaskDetailsDialog` has an **Edit** button and owns the edit step, so Schedule and Task Log are unchanged.
+  - Dashboard Assigned Tasks: the task title is now a button that opens Task details.
+**Why:** The FEAT-018 follow-up. The create dialog no longer sets Phase/Status, so tasks couldn't reach a phase or be completed. The user chose: Edit in Task details + Dashboard; all fields except the attachment; a log row only on status change.
+**Files:** `backend/src/Construction.Domain/Entities/ProjectTask.cs`,
+`backend/src/Construction.Application/Dashboard/{IProjectTaskRepository,IDashboardService,DashboardService,UpdateProjectTaskCommand}.cs`,
+`backend/src/Construction.Infrastructure/Repositories/ProjectTaskRepository.cs`,
+`backend/src/Construction.Api/Features/Dashboard/{DashboardController,DashboardContracts,UpdateProjectTaskRequestValidator}.cs`,
+`backend/src/Construction.Api/Construction.Api.http`,
+`frontend/src/features/dashboard/{AssigneeDropdown,EditTaskDialog,TaskDetailsDialog,NewTaskDialog,AssignedTasksPanel}.tsx`,
+`frontend/src/features/dashboard/{dashboard.api,dashboard.hooks,dashboard.schema}.ts`,
+`README.md`, `docs/*`.
+**Verification:**
+- `dotnet build` shows 0 warnings and 0 errors. `npm run build` passes (only the existing chunk-size warning) and oxlint exits 0.
+- curl against `PUT …/tasks/{id}` (Riverside Villas, "Pour foundation slab"):
+  - phase + `InProgress` → 200 with `phaseName`, and a `LOG-2026-012 … marked In Progress` row
+  - same status with a new deadline → 200, no new log row
+  - deadline before the assigned date → 400 `deadline`; empty title → 400
+  - unknown phase → 200 with `phaseId: null`
+  - unknown task or project → 404
+  - the task was restored afterwards (that added `LOG-2026-013 … marked Upcoming`)
+- Playwright (cached-Chromium script), 1440 px and 375 px:
+  - Dashboard title → Task details → Edit: fields prefilled, including "QA Bot", who isn't a team member. Save is disabled until a change. Cancel closes everything.
+  - Phase + In Progress → Save closes both dialogs, the Recent Log shows the status row, and reopening shows the new phase and status.
+  - Task Log shows the new phase subtitle and status badge. Edit there restored "No phase"/Upcoming via the clear icon.
+  - Schedule Upcoming Deadlines → Edit opens.
+  - No horizontal scroll and no page or console errors.
+  - Found during verification: a "View Details" column squeezed the Assigned Tasks "Task" column to 0 px at 1440 px. It was replaced by the clickable title, and the Task column is back to 106 px.
+**Follow-ups:**
+- Attachments can't be replaced or removed on edit.
+- There's no edit history beyond status rows.
+- The seeded Riverside log rows have future dates, so new rows sort below them there.
+- Test data remains: "Controller QA task" (restored to Upcoming/no phase) and "Pour foundation slab" each gained status log rows.
+- The API process (PID 53456) was stopped to rebuild. An API started from this session is running on :5080.
+
+---
+
+## 2026-09-25 — Dashboard "Log details" redesign + editable description (FEAT-019)
+**Refs:** FEAT-019, BUG-012, ADR-0018
+**What:**
+- **Backend:**
+  - `ActivityLogEntry` gains `LogNumber` (a `Create` parameter) and `UpdateDescription`.
+  - `DashboardService.CreateTaskAsync` numbers new entries `LOG-{year}-{count+1:000}` (the invoice pattern).
+  - `IActivityLogRepository` gains `CountByProjectAsync` and `GetAsync`.
+  - `ActivityLogEntryDto` (Application + API) adds `LogNumber`, `TaskTitle`, `AssigneeName`, `PhaseName` and `PhaseNumber`. A private `ToDtosAsync` joins entries to tasks and phases, with phases numbered in start-date order.
+  - New `PUT /api/projects/{id}/activity-log/{entryId}` (`UpdateActivityLogRequest` + validator, 1–2000 chars).
+  - Migration `AddActivityLogNumber`: `Description` goes from 500 to 2000 (BUG-012); `LogNumber` is added and backfilled with `ROW_NUMBER()` + `FORMAT(n,'000')`. `Down` truncates descriptions to 500 before shrinking the column.
+  - `.http` sample added.
+- **Frontend:**
+  - New `LogDetailsDialog` with a custom header (grey `#LOG-…` chip • date, task title clamped to 2 lines), a light-blue Phase/Milestone + Assignee box, and an editable light-blue Description (RHF + zod `logDescriptionSchema`). Save stays disabled until the text changes.
+  - `useUpdateActivityLog` invalidates the activity log.
+  - `RecentLogPanel` uses the new dialog.
+  - `.assign-task-dialog`/`.assign-task-actions` were renamed to the shared `.form-dialog`/`.form-dialog-actions`; `NewTaskDialog` is updated. Added `.log-info-box`/`.log-description`, plus `min-width: 0` on the dialog title so long titles wrap.
+**Why:** The user supplied the log-details mockup and asked to check what the backend needed. They chose: Save edits the description, and only the Dashboard Recent Log changes. BUG-012 was found while planning.
+**Files:** `backend/src/Construction.Domain/Entities/ActivityLogEntry.cs`,
+`backend/src/Construction.Application/Dashboard/{ActivityLogEntryDto,IActivityLogRepository,IDashboardService,DashboardService}.cs`,
+`backend/src/Construction.Infrastructure/{Repositories/ActivityLogRepository.cs,Persistence/AppDbContext.cs,Persistence/Migrations/*AddActivityLogNumber*}`,
+`backend/src/Construction.Api/Features/Dashboard/{DashboardController,DashboardContracts,UpdateActivityLogRequestValidator}.cs`,
+`backend/src/Construction.Api/Construction.Api.http`,
+`frontend/src/features/dashboard/{LogDetailsDialog,RecentLogPanel,NewTaskDialog}.tsx`,
+`frontend/src/features/dashboard/{dashboard.api,dashboard.hooks,dashboard.schema}.ts`, `frontend/src/index.css`,
+`README.md`, `docs/*`.
+**Verification:**
+- `dotnet build` shows 0 errors. `npm run build` passes (only the existing chunk-size warning) and oxlint exits 0.
+- The migration applied on startup, and existing entries were backfilled (`LOG-2026-001…009` on the test project).
+- curl:
+  - `POST …/tasks` with a 1000-char title → 201, and the new entry got `LOG-2026-010` (BUG-012)
+  - the list returns task title and assignee, and `phaseName`/`phaseNumber` (1) for a phased task
+  - `PUT` → 200 with the new text
+  - empty or 2001 chars → 400 with the validator messages
+  - unknown entry → 404; unknown project → 404
+- Playwright (cached-Chromium script), 1440 px and 375 px:
+  - matches the mockup layout, with no horizontal scroll and no page errors
+  - Save is disabled until edited; Cancel discards the edit
+  - Save closes the dialog and updates the Recent Log row, and reopening shows the saved text
+  - a 1000-char spaceless title clamps to 2 lines and the close button stays visible (fixed during verification)
+**Follow-ups:**
+- Log numbers could collide under concurrent inserts (the same accepted risk as invoice numbers).
+- There's no edit history for descriptions.
+- Test data remains in the dev DB, including the 1000-"x" task and edited log text.
+- The user's API process (PID 42412) was stopped to rebuild. An API instance started from this session is running.
+
+---
+
+## 2026-09-25 — "Assign New Task" modal redesign + task attachments (FEAT-018)
+**Refs:** FEAT-018, BUG-011, ADR-0017
+**What:**
+- **Frontend:** `NewTaskDialog` was rewritten to match the mockup.
+  - Fields: header "Assign New Task" with an inset divider; Task Details `InputTextarea`; "Assigned To:" `Dropdown` of active team members (via `useTeamMembers`, name + role item template, filter when there are more than 8, empty message pointing at Team); Deadline `Calendar` (`dd/mm/yy`, `minDate` today).
+  - Dashed attachment zone: camera tile, "Browse" pill, drag and drop. Once a file is picked it shows the name and size with Change and ×.
+  - Footer: equal full-width Cancel/Save.
+  - Scoped CSS lives in `index.css` under `.assign-task-dialog`, `.assign-task-actions` and `.assign-task-drop*`.
+  - `createTaskSchema` is now title (≤ 1000), assignee, deadline (not past) and an optional attachment (≤ 25 MB, `ALLOWED_EXTENSIONS`). `extensionOf` is exported from `documents.schema.ts` for this.
+  - `createProjectTask` posts `FormData`. `useCreateProjectTask` also invalidates the Task Log, documents and team queries (BUG-011).
+  - `TaskDetailsDialog` shows the full text and an "Open attachment" link. The new `lib/download.ts` `openBlobInNewTab` is shared with `DocumentsTable`.
+- **Backend:**
+  - `ProjectTask.AttachmentDocumentId`, an FK to `ProjectDocuments` with Restrict, indexed. `Title` max goes from 200 to 1000. Migration `AddTaskAttachment`.
+  - `DocumentUploadRules` gains `TaskAttachmentMaxSizeBytes` (25 MB) and `StorageKeyFor(...)`, now also used by `DocumentService`.
+  - `CreateProjectTaskCommand` takes an optional `TaskAttachment`.
+  - `DashboardService.CreateTaskAsync` stores the file, then writes the document, task and activity rows in one save, and deletes the file if the save fails.
+  - `POST …/tasks` is `[FromForm]` multipart with request-size limits. The request class has nullable strings, and the validator adds the attachment rules.
+  - Both task DTOs expose `AttachmentDocumentId`. The `.http` sample is now multipart.
+**Why:** The user supplied the "Assign New Task" mockup and asked for a frontend and backend redesign. They chose: Task Details = task text, one dialog everywhere with only the mockup's fields, and attachments stored in the Document repository.
+**Files:** `frontend/src/features/dashboard/{NewTaskDialog,TaskDetailsDialog}.tsx`,
+`frontend/src/features/dashboard/{dashboard.api,dashboard.schema,dashboard.hooks}.ts`,
+`frontend/src/features/documents/{documents.schema.ts,DocumentsTable.tsx}`,
+`frontend/src/lib/download.ts`, `frontend/src/index.css`,
+`backend/src/Construction.Domain/Entities/ProjectTask.cs`,
+`backend/src/Construction.Application/{Dashboard/{CreateProjectTaskCommand,DashboardService,ProjectTaskDto}.cs,Documents/{DocumentUploadRules,DocumentService}.cs}`,
+`backend/src/Construction.Infrastructure/Persistence/{AppDbContext.cs,Migrations/*AddTaskAttachment*}`,
+`backend/src/Construction.Api/Features/Dashboard/{DashboardController,DashboardContracts,CreateProjectTaskRequestValidator}.cs`,
+`backend/src/Construction.Api/Construction.Api.http`, `README.md`, `docs/*`.
+**Verification:**
+- `npm run build` passes (only the existing chunk-size warning) and `npm run lint` (oxlint) exits 0. `dotnet build` shows 0 warnings and 0 errors. The migration applied on startup.
+- curl against `POST …/tasks`:
+  - no attachment → 201
+  - 1 MB PDF → 201 with `attachmentDocumentId`, and the document is listed in `GET …/documents`
+  - 30 MB → 400 "Request body too large" (the UI maps this to "Attachments must be 25 MB or smaller")
+  - `.exe` → 400 "This file type isn't supported."
+  - deadline before assigned date → 400
+  - empty title/assignee → 400 with the validator's messages. MVC's implicit-required message showed up first and was fixed with nullable request strings.
+- Playwright (cached Chromium via a scratch script, because the MCP bridge wasn't connected):
+  - 1440 px and 375 px: modal matches the mockup, no horizontal scroll, no page errors.
+  - Empty Save → three inline errors. The dropdown lists 10 active members with roles.
+  - Save with a PDF → the task shows in Assigned Tasks and a Recent Log row appears. The file is listed on `/documents`.
+  - Schedule "+ New Task" and Task Log "New Log" open the same "Assign New Task" dialog.
+  - Task details "Open attachment" opens a blob tab.
+**Follow-ups:**
+- An edit-task flow, for Phase/Status now that the create dialog doesn't set them. Tasks created here don't appear on the Schedule roadmap until they have a phase.
+- A document delete must handle tasks that reference the document (the FK is Restrict).
+- Test tasks and `sample.pdf` documents created during verification remain in the dev DB ("Curl check …", "Playwright check …").
+- The running API dev server was stopped to rebuild and was restarted afterwards.
+
+---
+
 ## 2026-09-23 — Construction Phases card: design sizing
 **Refs:** BUG-010, FEAT-011
 **What:** Made the card as compact as the design frame (1117 × 618). Only sizes changed; layout, colors, row borders and behavior are the same.

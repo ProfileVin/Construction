@@ -1,7 +1,8 @@
 import dayjs from 'dayjs'
 import { Button } from 'primereact/button'
-import { useState } from 'react'
-import { NewTaskDialog } from '../dashboard/NewTaskDialog'
+import { Toast } from 'primereact/toast'
+import { useRef, useState } from 'react'
+import { NewLogDialog } from './NewLogDialog'
 import { TaskLogTable } from './TaskLogTable'
 import { TaskLogToolbar } from './TaskLogToolbar'
 import { useTaskLog } from './taskLog.hooks'
@@ -16,6 +17,7 @@ interface TaskLogPanelProps {
 
 export function TaskLogPanel({ projectId, projectName }: TaskLogPanelProps) {
   const [newLogVisible, setNewLogVisible] = useState(false)
+  const toast = useRef<Toast>(null)
   const [search, setSearch] = useState('')
   const [phaseId, setPhaseId] = useState<string | null>(null)
   const [status, setStatus] = useState<string | null>(null)
@@ -63,7 +65,21 @@ export function TaskLogPanel({ projectId, projectName }: TaskLogPanelProps) {
 
       <TaskLogTable data={data} isLoading={isLoading} page={page} pageSize={PAGE_SIZE} onPageChange={setPage} />
 
-      <NewTaskDialog projectId={projectId} visible={newLogVisible} onHide={() => setNewLogVisible(false)} />
+      {/* A log doesn't change the task table, so confirm it here; it shows in the Dashboard Recent Log. */}
+      <NewLogDialog
+        projectId={projectId}
+        visible={newLogVisible}
+        onHide={() => setNewLogVisible(false)}
+        onCreated={(entry) =>
+          toast.current?.show({
+            severity: 'success',
+            summary: `${entry.logNumber} created`,
+            detail: entry.taskTitle ? `Logged on "${entry.taskTitle}"` : undefined,
+            life: 4000,
+          })
+        }
+      />
+      <Toast ref={toast} position="bottom-right" />
     </div>
   )
 }

@@ -15,6 +15,7 @@ public static class DependencyInjection
     {
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IProjectService, ProjectService>();
+        services.AddScoped<AttachmentUploader>();
         services.AddScoped<IDashboardService, DashboardService>();
         services.AddScoped<IScheduleService, ScheduleService>();
         services.AddScoped<ITaskLogService, TaskLogService>();

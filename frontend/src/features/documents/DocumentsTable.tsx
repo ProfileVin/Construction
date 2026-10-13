@@ -3,7 +3,7 @@ import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 import { useState } from 'react'
 import { pagerTemplate } from '../../components/pagerTemplate'
-import { downloadBlob } from '../../lib/download'
+import { downloadBlob, openBlobInNewTab } from '../../lib/download'
 import { formatFileSize } from '../../lib/format'
 import { fetchDocumentContent, type DocumentFormat, type PagedDocuments, type ProjectDocument } from './documents.api'
 
@@ -29,20 +29,9 @@ export function DocumentsTable({ projectId, data, isLoading, page, pageSize, onP
 
   const openDocument = async (doc: ProjectDocument) => {
     setActionError(null)
-    // Open the tab synchronously so popup blockers treat it as user-initiated, then point it at the blob.
-    const tab = window.open('', '_blank')
     try {
-      const blob = await fetchDocumentContent(projectId, doc.id, false)
-      const url = URL.createObjectURL(blob)
-      if (tab) {
-        tab.opener = null
-        tab.location.href = url
-      } else {
-        window.location.assign(url)
-      }
-      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+      await openBlobInNewTab(() => fetchDocumentContent(projectId, doc.id, false))
     } catch {
-      tab?.close()
       setActionError(`Couldn't open "${doc.name}". Please try again.`)
     }
   }

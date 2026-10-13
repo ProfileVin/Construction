@@ -1,14 +1,30 @@
 import { zodResolver } from '@hookform/resolvers/zod'
+import { isAxiosError } from 'axios'
 import dayjs from 'dayjs'
 import { Button } from 'primereact/button'
 import { Calendar } from 'primereact/calendar'
 import { Dialog } from 'primereact/dialog'
 import { Dropdown } from 'primereact/dropdown'
-import { InputNumber } from 'primereact/inputnumber'
 import { InputText } from 'primereact/inputtext'
-import { Controller, useForm } from 'react-hook-form'
+import { Controller, useForm, useWatch } from 'react-hook-form'
 import { useCreatePhase } from './schedule.hooks'
-import { createPhaseSchema, phaseStatusOptions, type CreatePhaseValues } from './schedule.schema'
+import {
+  constructionPhaseOptions,
+  createPhaseSchema,
+  derivePhaseStatus,
+  type CreatePhaseValues,
+} from './schedule.schema'
+
+const EMPTY: Partial<CreatePhaseValues> = { title: '', phase: '', startDate: undefined, endDate: undefined }
+
+function getSaveErrorMessage(error: unknown): string {
+  if (isAxiosError(error)) {
+    const errors = error.response?.data?.errors as Record<string, string[]> | undefined
+    const first = errors && Object.values(errors).flat()[0]
+    if (first) return first
+  }
+  return 'Could not create the milestone. Please check the details and try again.'
+}
 
 interface NewMilestoneDialogProps {
   projectId: string
@@ -24,174 +40,151 @@ export function NewMilestoneDialog({ projectId, visible, onHide }: NewMilestoneD
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<CreatePhaseValues>({
-    resolver: zodResolver(createPhaseSchema),
-    defaultValues: { name: '', percentComplete: 0, status: 'Upcoming', checkpointLabel: '' },
-  })
+  } = useForm<CreatePhaseValues>({ resolver: zodResolver(createPhaseSchema), defaultValues: EMPTY })
+
+  const startDate = useWatch({ control, name: 'startDate' })
+
+  const close = () => {
+    if (createPhase.isPending) return
+    reset(EMPTY)
+    createPhase.reset()
+    onHide()
+  }
 
   const submit = handleSubmit(async (values) => {
     await createPhase.mutateAsync({
-      name: values.name,
+      name: values.phase,
+      checkpointLabel: values.title,
       startDate: dayjs(values.startDate).format('YYYY-MM-DD'),
       endDate: dayjs(values.endDate).format('YYYY-MM-DD'),
-      percentComplete: values.percentComplete,
-      status: values.status,
-      checkpointLabel: values.checkpointLabel || null,
+      ...derivePhaseStatus(values.startDate, values.endDate),
     })
-    reset()
-    onHide()
+    close()
   })
+
+  const labelClass = 'text-sm font-medium text-slate-900'
+  const errorClass = 'text-[13px] text-red-600'
 
   return (
     <Dialog
-      header="New milestone"
+      header="Assign New Milestone"
       visible={visible}
-      onHide={onHide}
+      onHide={close}
       modal
-      dismissableMask
-      style={{ width: '28rem' }}
-      className="mx-4"
+      dismissableMask={!createPhase.isPending}
+      closable={!createPhase.isPending}
+      draggable={false}
+      style={{ width: '36rem' }}
+      className="form-dialog mx-4"
     >
-      <form onSubmit={submit} className="flex flex-col gap-5">
+      <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
         <div className="flex flex-col gap-2">
-          <label htmlFor="name" className="text-[15px] font-semibold text-slate-800">
-            Phase name
+          <label htmlFor="milestone-title" className={labelClass}>
+            Milestone / Phase Title
           </label>
           <Controller
-            name="name"
+            name="title"
             control={control}
             render={({ field }) => (
               <InputText
-                id="name"
+                id="milestone-title"
                 autoFocus
-                placeholder="e.g. Roof Framing"
+                placeholder="Enter details"
                 className="w-full"
-                invalid={Boolean(errors.name)}
+                invalid={Boolean(errors.title)}
                 {...field}
               />
             )}
           />
-          {errors.name && <small className="text-[13px] text-red-600">{errors.name.message}</small>}
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="startDate" className="text-[15px] font-semibold text-slate-800">
-              Start date
-            </label>
-            <Controller
-              name="startDate"
-              control={control}
-              render={({ field }) => (
-                <Calendar
-                  inputId="startDate"
-                  value={field.value ?? null}
-                  onChange={(e) => field.onChange(e.value)}
-                  dateFormat="M d, yy"
-                  showIcon
-                  className="w-full"
-                />
-              )}
-            />
-            {errors.startDate && <small className="text-[13px] text-red-600">{errors.startDate.message}</small>}
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor="endDate" className="text-[15px] font-semibold text-slate-800">
-              End date
-            </label>
-            <Controller
-              name="endDate"
-              control={control}
-              render={({ field }) => (
-                <Calendar
-                  inputId="endDate"
-                  value={field.value ?? null}
-                  onChange={(e) => field.onChange(e.value)}
-                  dateFormat="M d, yy"
-                  showIcon
-                  className="w-full"
-                />
-              )}
-            />
-            {errors.endDate && <small className="text-[13px] text-red-600">{errors.endDate.message}</small>}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col gap-2">
-            <label htmlFor="status" className="text-[15px] font-semibold text-slate-800">
-              Status
-            </label>
-            <Controller
-              name="status"
-              control={control}
-              render={({ field }) => (
-                <Dropdown
-                  inputId="status"
-                  value={field.value}
-                  options={phaseStatusOptions as unknown as { label: string; value: string }[]}
-                  optionLabel="label"
-                  optionValue="value"
-                  onChange={(e) => field.onChange(e.value)}
-                  className="w-full"
-                />
-              )}
-            />
-          </div>
-
-          <div className="flex flex-col gap-2">
-            <label htmlFor="percentComplete" className="text-[15px] font-semibold text-slate-800">
-              Percent complete
-            </label>
-            <Controller
-              name="percentComplete"
-              control={control}
-              render={({ field }) => (
-                <InputNumber
-                  inputId="percentComplete"
-                  value={field.value}
-                  onValueChange={(e) => field.onChange(e.value ?? 0)}
-                  min={0}
-                  max={100}
-                  suffix="%"
-                  className="w-full"
-                />
-              )}
-            />
-            {errors.percentComplete && (
-              <small className="text-[13px] text-red-600">{errors.percentComplete.message}</small>
-            )}
-          </div>
+          {errors.title && <small className={errorClass}>{errors.title.message}</small>}
         </div>
 
         <div className="flex flex-col gap-2">
-          <label htmlFor="checkpointLabel" className="text-[15px] font-semibold text-slate-800">
-            Checkpoint label
+          <label htmlFor="milestone-phase" className={labelClass}>
+            Construction Phase
           </label>
           <Controller
-            name="checkpointLabel"
+            name="phase"
             control={control}
             render={({ field }) => (
-              <InputText
-                id="checkpointLabel"
-                placeholder="e.g. Trusses & Load Beams"
+              <Dropdown
+                inputId="milestone-phase"
+                value={field.value || null}
+                options={constructionPhaseOptions}
+                optionLabel="label"
+                optionValue="value"
+                placeholder="Select a phase"
+                onChange={(e) => field.onChange(e.value ?? '')}
+                onBlur={field.onBlur}
+                invalid={Boolean(errors.phase)}
                 className="w-full"
-                {...field}
               />
             )}
           />
+          {errors.phase && <small className={errorClass}>{errors.phase.message}</small>}
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <label htmlFor="milestone-start" className={labelClass}>
+            Deadline
+          </label>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-2">
+              <Controller
+                name="startDate"
+                control={control}
+                render={({ field }) => (
+                  <Calendar
+                    inputId="milestone-start"
+                    aria-label="Start date"
+                    value={field.value ?? null}
+                    onChange={(e) => field.onChange(e.value ?? undefined)}
+                    dateFormat="dd/mm/yy"
+                    placeholder="Start date"
+                    showIcon
+                    icon="pi pi-calendar"
+                    invalid={Boolean(errors.startDate)}
+                    className="w-full"
+                  />
+                )}
+              />
+              {errors.startDate && <small className={errorClass}>{errors.startDate.message}</small>}
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <Controller
+                name="endDate"
+                control={control}
+                render={({ field }) => (
+                  <Calendar
+                    inputId="milestone-end"
+                    aria-label="Completion date"
+                    value={field.value ?? null}
+                    onChange={(e) => field.onChange(e.value ?? undefined)}
+                    minDate={startDate}
+                    dateFormat="dd/mm/yy"
+                    placeholder="Completion date"
+                    showIcon
+                    icon="pi pi-calendar"
+                    invalid={Boolean(errors.endDate)}
+                    className="w-full"
+                  />
+                )}
+              />
+              {errors.endDate && <small className={errorClass}>{errors.endDate.message}</small>}
+            </div>
+          </div>
         </div>
 
         {createPhase.isError && (
           <div role="alert" className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">
-            Could not create the milestone. Please check the details and try again.
+            {getSaveErrorMessage(createPhase.error)}
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
-          <Button type="button" label="Cancel" outlined onClick={onHide} />
-          <Button type="submit" label="Create milestone" loading={createPhase.isPending} />
+        <div className="form-dialog-actions mt-2 grid grid-cols-2 gap-4 sm:gap-8">
+          <Button type="button" label="Cancel" outlined onClick={close} disabled={createPhase.isPending} />
+          <Button type="submit" label="Save" loading={createPhase.isPending} />
         </div>
       </form>
     </Dialog>

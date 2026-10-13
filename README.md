@@ -66,6 +66,13 @@ dotnet run
 | POST   | `/api/onboarding/complete`   | bearer JWT  | Mark onboarding done (+ start mode) → updated user |
 | GET    | `/api/projects`              | bearer JWT  | Current user's projects                       |
 | POST   | `/api/projects`              | bearer JWT  | Create a project                             |
+| GET    | `/api/projects/{id}/tasks`   | bearer JWT  | Project tasks (incl. `attachmentDocumentId`)  |
+| POST   | `/api/projects/{id}/tasks`   | bearer JWT  | Multipart create (`title`, `assigneeName`, `assignedDate`, `deadline`, optional `phaseId`, `status`, `attachment` ≤ 25 MB → stored as a project document); mirrors an activity-log row |
+| PUT    | `/api/projects/{id}/tasks/{taskId}` | bearer JWT | JSON edit (`title`, `assigneeName`, `deadline`, `phaseId` or null, `status`) → updated task. Deadline must be on or after the assigned date (400). A status change adds an activity-log row |
+| GET    | `/api/projects/{id}/activity-log` | bearer JWT | 20 most recent activity-log entries (`logNumber`, description, linked task title / assignee / phase name + number, `category`, `attachmentDocumentId`) |
+| POST   | `/api/projects/{id}/budget/invoices` | bearer JWT | Multipart "Record New Expense" (`vendorName` = title, optional `categoryId`, `amount` > 0, `status` = Pending/Paid/Scheduled, `issuedDate`, optional `referenceNumber` ≤ 40 replacing the generated `INV-{year}-{seq}`, `notes` ≤ 2000, `receipt` ≤ 25 MB → project document) → 201 invoice. Pending + Scheduled count as Committed POs |
+| POST   | `/api/projects/{id}/activity-log` | bearer JWT | Multipart "New Log" on a task (`taskId`, `category` = Framing/Structural/Finishing/Electrical/Mechanical/Plumbing, `assigneeName`, `note` ≤ 2000, optional `attachment` ≤ 25 MB → project document) → 201 numbered entry; 404 if the task isn't in the project |
+| PUT    | `/api/projects/{id}/activity-log/{entryId}` | bearer JWT | `{ "description": "…" }` (1–2000 chars) → updated entry |
 | GET    | `/api/projects/{id}/documents` | bearer JWT | Paged documents (`search`, `format`=Image/Pdf/Word/Spreadsheet/Other, `page`, `pageSize`) |
 | GET    | `/api/projects/{id}/documents/counts` | bearer JWT | Document counts: `all` + per format        |
 | POST   | `/api/projects/{id}/documents` | bearer JWT | Multipart upload (`file`, optional `name`, `phaseId`); ≤ 100 MB, extension allow-list |

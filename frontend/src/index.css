@@ -483,6 +483,185 @@ body {
   padding: 0.5rem 1.5rem 1.5rem;
 }
 
+/* Form dialogs ("Assign New Task" FEAT-018, "Log details" FEAT-019) — inset divider under the
+   title, squarer 4px fields, equal full-width Cancel/Save. `.p-component` in the button selectors
+   ties/beats the global filled/outlined rules' specificity and wins by source order (as BUG-009).
+   The header is inset (for the divider), so the root must supply the white behind its margins. */
+.form-dialog {
+  background: #fff;
+}
+.form-dialog .p-dialog-header {
+  margin: 0 1.5rem;
+  padding: 1.25rem 0 0.85rem;
+  border-bottom: 1px solid #eef0f3;
+}
+.form-dialog .p-dialog-title {
+  font-size: 17px;
+  font-weight: 500;
+  color: #0f172a;
+}
+.form-dialog .p-dialog-content {
+  padding-top: 1.25rem;
+}
+.form-dialog .p-inputtext,
+.form-dialog .p-dropdown {
+  border-radius: 4px;
+  font-size: 14px;
+}
+.form-dialog .p-inputtext {
+  padding: 0.7rem 0.85rem;
+}
+.form-dialog .p-dropdown .p-dropdown-label {
+  padding: 0.7rem 0.85rem;
+  font-size: 14px;
+}
+.form-dialog .p-calendar .p-inputtext {
+  border-radius: 4px 0 0 4px;
+}
+.form-dialog .p-calendar .p-button.p-datepicker-trigger {
+  border-radius: 0 4px 4px 0;
+  color: #64748b;
+}
+.form-dialog-actions .p-button.p-component {
+  justify-content: center;
+  min-height: 2.9rem;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.form-dialog-actions .p-button.p-component.p-button-outlined {
+  background: #fff;
+}
+.form-dialog-actions .p-button .p-button-label {
+  font-weight: 500;
+}
+/* A custom two-line header (badge line + title): keep the close button on the first line. */
+.form-dialog .p-dialog-header {
+  align-items: flex-start;
+}
+/* Let long titles wrap instead of pushing the close button out of the header. */
+.form-dialog .p-dialog-title {
+  min-width: 0;
+}
+/* Compact variant ("Record New Expense", BUG-013): eight stacked fields must fit a ~800px-tall
+   viewport without the content scrolling, so trim header/content padding, field height, the
+   drop zone and the action buttons. Scoped so the other form dialogs keep the roomy sizing. */
+.form-dialog--compact .p-dialog-header {
+  padding: 0.85rem 0 0.6rem;
+}
+.form-dialog--compact .p-dialog-content {
+  padding-top: 0.85rem;
+  padding-bottom: 0.75rem;
+}
+.form-dialog--compact .p-inputtext {
+  padding: 0.45rem 0.75rem;
+  font-size: 13.5px;
+}
+.form-dialog--compact .p-dropdown .p-dropdown-label {
+  padding: 0.45rem 0.75rem;
+  font-size: 13.5px;
+}
+.form-dialog--compact .assign-task-drop {
+  padding: 0.35rem 0.85rem;
+}
+.form-dialog--compact .assign-task-drop__tile {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1rem;
+}
+.form-dialog--compact .form-dialog-actions .p-button.p-component {
+  min-height: 2.4rem;
+  font-size: 15px;
+}
+/* Log details (FEAT-019): light-blue info box + borderless light-blue editable description */
+.log-info-box {
+  border-radius: 10px;
+  background: #eef3fb;
+}
+.form-dialog .p-inputtext.log-description {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #eef3fb;
+  padding: 0.9rem 1rem;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #334155;
+}
+.form-dialog .p-inputtext.log-description:enabled:hover {
+  border-color: #d5e1f3;
+}
+.form-dialog .p-inputtext.log-description.p-invalid {
+  border-color: #dc2626;
+}
+/* "New Log" (FEAT-022): single-select Construction Phase chips — pale blue, brand fill when picked. */
+.log-chip {
+  border-radius: 4px;
+  background: #eef3fb;
+  padding: 0.35rem 0.7rem;
+  font-size: 14px;
+  color: #334155;
+  transition: background-color 0.15s, color 0.15s;
+}
+.log-chip:hover {
+  background: #e0e9f7;
+}
+.log-chip.is-active {
+  background: var(--color-brand);
+  color: #fff;
+}
+.log-chip:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+.assign-task-drop {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f1f2f4;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+button.assign-task-drop:hover,
+.assign-task-drop.is-dragging {
+  border-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 5%, #f1f2f4);
+}
+button.assign-task-drop:focus-visible {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+.assign-task-drop.is-invalid {
+  border-color: #fca5a5;
+}
+.assign-task-drop__tile {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-brand);
+  font-size: 1.1rem;
+}
+.assign-task-drop__pill {
+  flex-shrink: 0;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+button.assign-task-drop__pill:hover {
+  background: #f8fafc;
+}
+
 /* Avatar (topbar initials) */
 .p-avatar {
   background: var(--color-brand);
@@ -531,4 +710,37 @@ body {
 }
 .topbar-search .p-inputtext:enabled:focus {
   box-shadow: none;
+}
+
+/* "Record New Expense" payment status (FEAT-023) — full-width mint track with a teal border and three
+   equal segments; the picked one is brand-filled. Same shape as the schedule zoom toggle. */
+.expense-status-toggle.p-selectbutton {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #5eead4;
+  border-radius: 6px;
+  background: #f0fdf9;
+}
+.expense-status-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text) {
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  box-shadow: none;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 0.35rem 0.5rem;
+}
+.expense-status-toggle.p-selectbutton .p-button .p-button-label {
+  font-weight: inherit;
+}
+.expense-status-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text):not(.p-highlight):enabled:hover {
+  background: #d1fae5;
+}
+.expense-status-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text).p-highlight {
+  background: var(--color-brand);
+  color: #fff;
 }

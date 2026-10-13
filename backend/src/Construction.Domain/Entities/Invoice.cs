@@ -4,6 +4,7 @@ public enum InvoiceStatus
 {
     Pending,
     Paid,
+    Scheduled,
 }
 
 public class Invoice
@@ -16,6 +17,10 @@ public class Invoice
     public decimal Amount { get; private set; }
     public InvoiceStatus Status { get; private set; }
     public DateOnly IssuedDate { get; private set; }
+    public string? Notes { get; private set; }
+
+    /// <summary>The receipt / supporting voucher, stored as a <see cref="ProjectDocument"/>.</summary>
+    public Guid? ReceiptDocumentId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -31,7 +36,9 @@ public class Invoice
         decimal amount,
         InvoiceStatus status,
         DateOnly issuedDate,
-        DateTime nowUtc)
+        DateTime nowUtc,
+        string? notes = null,
+        Guid? receiptDocumentId = null)
     {
         if (string.IsNullOrWhiteSpace(invoiceNumber))
         {
@@ -58,6 +65,8 @@ public class Invoice
             Amount = amount,
             Status = status,
             IssuedDate = issuedDate,
+            Notes = string.IsNullOrWhiteSpace(notes) ? null : notes.Trim(),
+            ReceiptDocumentId = receiptDocumentId,
             CreatedAt = nowUtc,
             UpdatedAt = nowUtc,
         };

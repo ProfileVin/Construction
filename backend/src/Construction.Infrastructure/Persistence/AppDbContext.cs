@@ -47,7 +47,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
         builder.Entity<ProjectTask>(entity =>
         {
-            entity.Property(t => t.Title).HasMaxLength(200).IsRequired();
+            entity.Property(t => t.Title).HasMaxLength(1000).IsRequired();
             entity.Property(t => t.AssigneeName).HasMaxLength(200).IsRequired();
             entity.Property(t => t.AssignedDate).HasColumnType("date");
             entity.Property(t => t.Deadline).HasColumnType("date");
@@ -63,6 +63,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .WithMany()
                 .HasForeignKey(t => t.PhaseId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+            // Restrict: a second cascade path from Project (via ProjectDocuments) isn't allowed on SQL Server.
+            entity.HasIndex(t => t.AttachmentDocumentId);
+            entity.HasOne<ProjectDocument>()
+                .WithMany()
+                .HasForeignKey(t => t.AttachmentDocumentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ConstructionPhase>(entity =>
@@ -98,8 +104,15 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             entity.Property(i => i.Amount).HasColumnType("decimal(18,2)");
             entity.Property(i => i.Status).HasConversion<string>().HasMaxLength(40);
             entity.Property(i => i.IssuedDate).HasColumnType("date");
+            entity.Property(i => i.Notes).HasMaxLength(2000);
             entity.HasIndex(i => i.ProjectId);
             entity.HasIndex(i => i.CategoryId);
+            // Restrict for the same multiple-cascade-path reason as ProjectTask.AttachmentDocumentId.
+            entity.HasIndex(i => i.ReceiptDocumentId);
+            entity.HasOne<ProjectDocument>()
+                .WithMany()
+                .HasForeignKey(i => i.ReceiptDocumentId)
+                .OnDelete(DeleteBehavior.Restrict);
             entity.HasOne<Project>()
                 .WithMany()
                 .HasForeignKey(i => i.ProjectId)
@@ -153,7 +166,11 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
         builder.Entity<ActivityLogEntry>(entity =>
         {
-            entity.Property(e => e.Description).HasMaxLength(500).IsRequired();
+            // 2000: the auto text embeds the task text (≤ 1000 since FEAT-018) and is user-editable (BUG-012).
+            entity.Property(e => e.Description).HasMaxLength(2000).IsRequired();
+            entity.Property(e => e.LogNumber).HasMaxLength(40).IsRequired();
+            entity.Property(e => e.AssigneeName).HasMaxLength(200);
+            entity.Property(e => e.Category).HasMaxLength(40);
             entity.HasIndex(e => e.ProjectId);
             entity.HasIndex(e => e.OccurredAt);
             entity.HasOne<Project>()
@@ -163,6 +180,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             entity.HasOne<ProjectTask>()
                 .WithMany()
                 .HasForeignKey(e => e.ProjectTaskId)
+                .OnDelete(DeleteBehavior.Restrict);
+            // Restrict for the same multiple-cascade-path reason as ProjectTask.AttachmentDocumentId.
+            entity.HasIndex(e => e.AttachmentDocumentId);
+            entity.HasOne<ProjectDocument>()
+                .WithMany()
+                .HasForeignKey(e => e.AttachmentDocumentId)
                 .OnDelete(DeleteBehavior.Restrict);
         });
 

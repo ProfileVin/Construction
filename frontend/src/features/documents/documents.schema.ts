@@ -11,7 +11,7 @@ export const ALLOWED_EXTENSIONS = [
   '.dwg', '.dxf', '.txt', '.zip',
 ]
 
-const extensionOf = (fileName: string) => {
+export const extensionOf = (fileName: string) => {
   const dot = fileName.lastIndexOf('.')
   return dot >= 0 ? fileName.slice(dot).toLowerCase() : ''
 }

@@ -1,6 +1,14 @@
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { type QueryClient, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useProjectStore } from '../../stores/projectStore'
-import { createProjectTask, listActivityLog, listProjectTasks } from './dashboard.api'
+import {
+  createActivityLog,
+  createProjectTask,
+  listActivityLog,
+  listProjectTasks,
+  updateActivityLog,
+  updateProjectTask,
+  type UpdateProjectTaskPayload,
+} from './dashboard.api'
 import { useProjects } from '../projects/projects.hooks'
 
 export function useSelectedProject() {
@@ -18,15 +26,52 @@ export function useProjectTasks(projectId: string | undefined) {
   })
 }
 
+/** Everything a task create/edit can change: task lists, the Recent Log, attachments and Active Tasks counts. */
+function invalidateTaskQueries(qc: QueryClient, projectId: string | undefined) {
+  qc.invalidateQueries({ queryKey: ['dashboard', 'tasks', projectId] })
+  qc.invalidateQueries({ queryKey: ['dashboard', 'activity-log', projectId] })
+  qc.invalidateQueries({ queryKey: ['taskLog', 'search', projectId] })
+  qc.invalidateQueries({ queryKey: ['documents', 'search', projectId] })
+  qc.invalidateQueries({ queryKey: ['documents', 'counts', projectId] })
+  qc.invalidateQueries({ queryKey: ['team', 'search', projectId] })
+}
+
 export function useCreateProjectTask(projectId: string | undefined) {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (payload: Parameters<typeof createProjectTask>[1]) =>
       createProjectTask(projectId as string, payload),
+    onSuccess: () => invalidateTaskQueries(qc, projectId),
+  })
+}
+
+export function useUpdateProjectTask(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, payload }: { taskId: string; payload: UpdateProjectTaskPayload }) =>
+      updateProjectTask(projectId as string, taskId, payload),
+    onSuccess: () => invalidateTaskQueries(qc, projectId),
+  })
+}
+
+export function useCreateActivityLog(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (payload: Parameters<typeof createActivityLog>[1]) => createActivityLog(projectId as string, payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['dashboard', 'tasks', projectId] })
       qc.invalidateQueries({ queryKey: ['dashboard', 'activity-log', projectId] })
+      qc.invalidateQueries({ queryKey: ['documents', 'search', projectId] })
+      qc.invalidateQueries({ queryKey: ['documents', 'counts', projectId] })
     },
+  })
+}
+
+export function useUpdateActivityLog(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ entryId, description }: { entryId: string; description: string }) =>
+      updateActivityLog(projectId as string, entryId, description),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['dashboard', 'activity-log', projectId] }),
   })
 }
 

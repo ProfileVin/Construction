@@ -1,3 +1,4 @@
+using Construction.Application.Documents;
 using FluentValidation;
 
 namespace Construction.Api.Features.Dashboard;
@@ -7,8 +8,8 @@ public class CreateProjectTaskRequestValidator : AbstractValidator<CreateProject
     public CreateProjectTaskRequestValidator()
     {
         RuleFor(x => x.Title)
-            .NotEmpty().WithMessage("Task title is required.")
-            .MaximumLength(200).WithMessage("Keep the title under 200 characters.");
+            .NotEmpty().WithMessage("Task details are required.")
+            .MaximumLength(1000).WithMessage("Keep the task details under 1000 characters.");
 
         RuleFor(x => x.AssigneeName)
             .NotEmpty().WithMessage("Assignee is required.")
@@ -23,5 +24,15 @@ public class CreateProjectTaskRequestValidator : AbstractValidator<CreateProject
             .WithMessage("Deadline must be on or after the assigned date.");
 
         RuleFor(x => x.Status).IsInEnum();
+
+        When(x => x.Attachment is not null, () =>
+        {
+            RuleFor(x => x.Attachment!)
+                .Must(f => f.Length > 0).WithMessage("The attachment is empty.")
+                .Must(f => f.Length <= DocumentUploadRules.TaskAttachmentMaxSizeBytes)
+                .WithMessage("Attachments must be 25 MB or smaller.")
+                .Must(f => DocumentUploadRules.IsAllowedExtension(f.FileName))
+                .WithMessage("This file type isn't supported.");
+        });
     }
 }

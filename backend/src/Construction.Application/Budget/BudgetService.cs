@@ -1,4 +1,5 @@
 using Construction.Application.Common;
+using Construction.Application.Documents;
 using Construction.Application.Projects;
 using Construction.Domain.Entities;
 
@@ -8,6 +9,7 @@ public class BudgetService(
     IProjectRepository projects,
     IBudgetCategoryRepository categories,
     IInvoiceRepository invoices,
+    AttachmentUploader attachments,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) : IBudgetService
 {
@@ -22,7 +24,7 @@ public class BudgetService(
         var categoryList = await categories.ListByProjectAsync(projectId, cancellationToken);
         var invoiceList = await invoices.ListByProjectAsync(projectId, cancellationToken);
 
-        var committedPOs = invoiceList.Where(i => i.Status == InvoiceStatus.Pending).Sum(i => i.Amount);
+        var committedPOs = invoiceList.Where(i => i.Status is InvoiceStatus.Pending or InvoiceStatus.Scheduled).Sum(i => i.Amount);
         var unbilledWork = Math.Max(0, categoryList.Sum(c => c.SpentAmount) - invoiceList.Sum(i => i.Amount));
 
         var contingencyCategory = categoryList.FirstOrDefault(c => c.IsContingency);
@@ -96,15 +98,20 @@ public class BudgetService(
         }
 
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
-        var sequence = await invoices.CountByProjectAsync(projectId, cancellationToken) + 1;
-        var invoiceNumber = $"INV-{command.IssuedDate.Year}-{sequence:000}";
+        var invoiceNumber = command.ReferenceNumber?.Trim();
+        if (string.IsNullOrEmpty(invoiceNumber))
+        {
+            var sequence = await invoices.CountByProjectAsync(projectId, cancellationToken) + 1;
+            invoiceNumber = $"INV-{command.IssuedDate.Year}-{sequence:000}";
+        }
 
+        var receipt = await attachments.BuildAsync(ownerId, projectId, phaseId: null, command.Receipt, nowUtc, cancellationToken);
         var invoice = Invoice.Create(
             projectId, invoiceNumber, command.VendorName, command.CategoryId, command.Amount,
-            command.Status, command.IssuedDate, nowUtc);
+            command.Status, command.IssuedDate, nowUtc, command.Notes, receipt?.Id);
 
-        await invoices.AddAsync(invoice, cancellationToken);
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        await attachments.SaveWithAsync(
+            receipt, command.Receipt, () => invoices.AddAsync(invoice, cancellationToken), cancellationToken);
 
         string? categoryName = null;
         if (invoice.CategoryId is { } categoryId)

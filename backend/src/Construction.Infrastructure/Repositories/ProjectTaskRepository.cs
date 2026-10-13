@@ -79,6 +79,9 @@ public class ProjectTaskRepository(AppDbContext db) : IProjectTaskRepository
         return counts;
     }
 
+    public Task<ProjectTask?> GetAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken) =>
+        db.ProjectTasks.FirstOrDefaultAsync(t => t.ProjectId == projectId && t.Id == taskId, cancellationToken);
+
     public Task AddAsync(ProjectTask task, CancellationToken cancellationToken)
     {
         db.ProjectTasks.Add(task);

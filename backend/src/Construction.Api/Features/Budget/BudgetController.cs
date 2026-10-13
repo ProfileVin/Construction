@@ -1,5 +1,7 @@
 using Construction.Api.Common;
 using Construction.Application.Budget;
+using Construction.Application.Dashboard;
+using Construction.Application.Documents;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -10,6 +12,9 @@ namespace Construction.Api.Features.Budget;
 [Authorize]
 public class BudgetController(IBudgetService budgetService) : ControllerBase
 {
+    // Multipart framing adds a little on top of the receipt itself.
+    private const long MaxRequestBytes = DocumentUploadRules.TaskAttachmentMaxSizeBytes + (1024 * 1024);
+
     [HttpGet("summary")]
     public async Task<IResult> GetSummaryAsync(Guid projectId, CancellationToken cancellationToken)
     {
@@ -46,8 +51,10 @@ public class BudgetController(IBudgetService budgetService) : ControllerBase
     }
 
     [HttpPost("invoices")]
+    [RequestSizeLimit(MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxRequestBytes)]
     public async Task<IResult> CreateInvoiceAsync(
-        Guid projectId, [FromBody] CreateInvoiceRequest request, CancellationToken cancellationToken)
+        Guid projectId, [FromForm] CreateInvoiceRequest request, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (userId is null)
@@ -55,8 +62,16 @@ public class BudgetController(IBudgetService budgetService) : ControllerBase
             return Results.Unauthorized();
         }
 
+        // Size/extension are already checked by CreateInvoiceRequestValidator (run by FluentValidationFilter).
+        await using var content = request.Receipt?.OpenReadStream();
+        var receipt = request.Receipt is { } file
+            ? new TaskAttachment(file.FileName, file.ContentType, file.Length, content!)
+            : null;
+
+        // A non-empty VendorName (the title) is guaranteed by the validator.
         var command = new CreateInvoiceCommand(
-            request.VendorName, request.CategoryId, request.Amount, request.Status, request.IssuedDate);
+            request.VendorName!, request.CategoryId, request.Amount, request.Status, request.IssuedDate,
+            request.ReferenceNumber, request.Notes, receipt);
         var invoice = await budgetService.CreateInvoiceAsync(userId, projectId, command, cancellationToken);
 
         return invoice is null

@@ -6,6 +6,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useProjectTasks } from './dashboard.hooks'
 import { NewTaskDialog } from './NewTaskDialog'
+import { TaskDetailsDialog } from './TaskDetailsDialog'
 import type { ProjectTask } from './dashboard.api'
 
 interface AssignedTasksPanelProps {
@@ -15,6 +16,7 @@ interface AssignedTasksPanelProps {
 export function AssignedTasksPanel({ projectId }: AssignedTasksPanelProps) {
   const { data: tasks, isLoading } = useProjectTasks(projectId)
   const [dialogVisible, setDialogVisible] = useState(false)
+  const [selected, setSelected] = useState<ProjectTask | null>(null)
 
   return (
     <div className="h-full rounded-lg border border-slate-200 bg-white p-4 sm:p-5">
@@ -37,7 +39,20 @@ export function AssignedTasksPanel({ projectId }: AssignedTasksPanelProps) {
             headerClassName="dash-table__center"
             style={{ width: '3rem' }}
           />
-          <Column header="Task" body={(row: ProjectTask) => <span title={row.title}>{row.title}</span>} />
+          {/* The fixed columns leave no room for an Action column (FEAT-017), so the title opens the details. */}
+          <Column
+            header="Task"
+            body={(row: ProjectTask) => (
+              <button
+                type="button"
+                onClick={() => setSelected(row)}
+                title={row.title}
+                className="block w-full cursor-pointer truncate text-left hover:text-sky-900 hover:underline"
+              >
+                {row.title}
+              </button>
+            )}
+          />
           <Column
             header="Assignee"
             body={(row: ProjectTask) => <span title={row.assigneeName}>{row.assigneeName}</span>}
@@ -66,6 +81,7 @@ export function AssignedTasksPanel({ projectId }: AssignedTasksPanelProps) {
       </div>
 
       <NewTaskDialog projectId={projectId} visible={dialogVisible} onHide={() => setDialogVisible(false)} />
+      <TaskDetailsDialog task={selected} onHide={() => setSelected(null)} />
     </div>
   )
 }

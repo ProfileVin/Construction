@@ -28,10 +28,26 @@ namespace Construction.Infrastructure.Persistence.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
+                    b.Property<string>("AssigneeName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<Guid?>("AttachmentDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<string>("Category")
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
                     b.Property<string>("Description")
                         .IsRequired()
-                        .HasMaxLength(500)
-                        .HasColumnType("nvarchar(500)");
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("LogNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
 
                     b.Property<DateTime>("OccurredAt")
                         .HasColumnType("datetime2");
@@ -43,6 +59,8 @@ namespace Construction.Infrastructure.Persistence.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AttachmentDocumentId");
 
                     b.HasIndex("OccurredAt");
 
@@ -161,7 +179,14 @@ namespace Construction.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("IssuedDate")
                         .HasColumnType("date");
 
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid?>("ReceiptDocumentId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Status")
@@ -182,6 +207,8 @@ namespace Construction.Infrastructure.Persistence.Migrations
                     b.HasIndex("CategoryId");
 
                     b.HasIndex("ProjectId");
+
+                    b.HasIndex("ReceiptDocumentId");
 
                     b.ToTable("Invoices");
                 });
@@ -322,6 +349,9 @@ namespace Construction.Infrastructure.Persistence.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("nvarchar(200)");
 
+                    b.Property<Guid?>("AttachmentDocumentId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
 
@@ -343,13 +373,15 @@ namespace Construction.Infrastructure.Persistence.Migrations
 
                     b.Property<string>("Title")
                         .IsRequired()
-                        .HasMaxLength(200)
-                        .HasColumnType("nvarchar(200)");
+                        .HasMaxLength(1000)
+                        .HasColumnType("nvarchar(1000)");
 
                     b.Property<DateTime>("UpdatedAt")
                         .HasColumnType("datetime2");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("AttachmentDocumentId");
 
                     b.HasIndex("PhaseId");
 
@@ -1179,6 +1211,11 @@ namespace Construction.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Construction.Domain.Entities.ActivityLogEntry", b =>
                 {
+                    b.HasOne("Construction.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("AttachmentDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Construction.Domain.Entities.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
@@ -1220,6 +1257,11 @@ namespace Construction.Infrastructure.Persistence.Migrations
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
+
+                    b.HasOne("Construction.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("ReceiptDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
                 });
 
             modelBuilder.Entity("Construction.Domain.Entities.Project", b =>
@@ -1246,6 +1288,11 @@ namespace Construction.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Construction.Domain.Entities.ProjectTask", b =>
                 {
+                    b.HasOne("Construction.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("AttachmentDocumentId")
+                        .OnDelete(DeleteBehavior.Restrict);
+
                     b.HasOne("Construction.Domain.Entities.ConstructionPhase", null)
                         .WithMany()
                         .HasForeignKey("PhaseId");

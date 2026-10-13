@@ -25,6 +25,9 @@ export function useCreateInvoice(projectId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['budget', 'summary', projectId] })
       qc.invalidateQueries({ queryKey: ['budget', 'invoices', projectId] })
+      // A receipt is stored as a project document.
+      qc.invalidateQueries({ queryKey: ['documents', 'search', projectId] })
+      qc.invalidateQueries({ queryKey: ['documents', 'counts', projectId] })
     },
   })
 }

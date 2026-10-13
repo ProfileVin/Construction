@@ -10,6 +10,7 @@ import type { Invoice } from './budget.api'
 const STATUS_STYLES: Record<string, string> = {
   Paid: 'bg-emerald-100 text-emerald-700',
   Pending: 'bg-blue-100 text-blue-700',
+  Scheduled: 'bg-amber-100 text-amber-700',
 }
 
 const PAGE_SIZE = 8

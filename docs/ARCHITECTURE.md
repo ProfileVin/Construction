@@ -101,6 +101,9 @@ backend/
                    command, ct, occurredAtUtc: null) — the optional param lets
                    DbSeeder backdate timestamps while the live endpoint omits it,
                    so the task+activity-log mirroring logic exists in one place.
+                   UpdateTaskAsync (FEAT-020) shares the private
+                   AddLogEntryAsync (LOG-{year}-{seq} numbering) and adds a
+                   row only when the status changes.
       DependencyInjection.cs   AddApplication(): registers IProjectService/
                    IDashboardService, AddSingleton(TimeProvider.System).
     Construction.Infrastructure/    → Domain + Application
@@ -178,9 +181,31 @@ Config: `appsettings.json` — `ConnectionStrings:Default` (LocalDB), `Jwt:*`
   JSON-serializes the form. Authed file endpoints can't be plain `<a href>`s:
   fetch with `responseType: 'blob'` and open or download via an object URL
   (`lib/download.ts` `downloadBlob(blob, fileName)`; used by Documents and the
-  Team CSV export). Backend file bytes go through
-  `IFileStorage` (`FileStorage:RootPath`), never direct `File.*` calls in
-  services.
+  Team CSV export; `openBlobInNewTab(fetcher)` opens one in a new tab without
+  tripping popup blockers — Documents "Open" and the task "Open attachment").
+  Backend file bytes go through `IFileStorage` (`FileStorage:RootPath`), never
+  direct `File.*` calls in services; build storage keys with
+  `DocumentUploadRules.StorageKeyFor(...)`. A file attached to another record
+  (e.g. a task, FEAT-018 / ADR-0017) is saved as a `ProjectDocument` and linked
+  by id, in the same `SaveChangesAsync`, deleting the stored file if the save
+  throws.
+- **Form-style dialogs (mockup look):** add `className="form-dialog mx-4"` to the
+  PrimeReact `Dialog` (inset header divider, 4px fields, a custom two-line
+  header works) and wrap Cancel/Save in `form-dialog-actions` (a 2-column grid of
+  equal full-width buttons). Used by `NewTaskDialog` (FEAT-018),
+  `LogDetailsDialog` (FEAT-019) and `EditTaskDialog` (FEAT-020). A tall form
+  that must fit without scrolling adds `form-dialog--compact` (tighter padding,
+  fields, drop zone and buttons). Pair it with 13px labels, `gap-2.5`/`gap-1`
+  and `<AttachmentDropZone compact>`, as in `NewExpenseDialog` (BUG-013).
+- **Picking a task assignee:** `features/dashboard/AssigneeDropdown.tsx` (active
+  team members, name + role). Pass `currentName` when editing, so a saved
+  assignee who isn't an active member stays selectable.
+- **Task create/edit cache refresh:** both task mutations call
+  `invalidateTaskQueries` in `dashboard.hooks.ts`. Add new task-dependent query
+  keys there, not in one mutation.
+- **Details → Edit:** the details dialog owns the edit step. It hides itself and
+  opens the form, and Save/Cancel closes both, so callers only pass the record
+  (`TaskDetailsDialog` → `EditTaskDialog`, FEAT-020).
 - **Paginated DataTable S.No:** use `opts.rowIndex + 1`. PrimeReact's
   `rowIndex` already includes the paginator offset (BUG-006).
 - **List-page table look (Documents, Team):** `className="app-table"` on a lazy
