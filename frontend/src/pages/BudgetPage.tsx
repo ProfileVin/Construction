@@ -1,9 +1,16 @@
 import { Button } from 'primereact/button'
 import { ProgressSpinner } from 'primereact/progressspinner'
 import { useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { ComingSoonPage } from '../components/ComingSoonPage'
+import { ChangeOrdersPanel } from '../features/change-orders/ChangeOrdersPanel'
 import { BudgetSummaryCard } from '../features/dashboard/BudgetSummaryCard'
 import { useSelectedProject } from '../features/dashboard/dashboard.hooks'
+import { InvoicesTabPanel } from '../features/invoices/InvoicesTabPanel'
 import { NewProjectDialog } from '../features/projects/NewProjectDialog'
+import { PurchaseOrdersPanel } from '../features/purchase-orders/PurchaseOrdersPanel'
+import { BudgetTabs } from '../features/budget/BudgetTabs'
+import { BUDGET_TABS, isBudgetTab, type BudgetTab } from '../features/budget/budget.tabs'
 import { CategoryBreakdownPanel } from '../features/budget/CategoryBreakdownPanel'
 import { InvoicesPanel } from '../features/budget/InvoicesPanel'
 import { useAuthStore } from '../stores/authStore'
@@ -12,8 +19,13 @@ export function BudgetPage() {
   const user = useAuthStore((s) => s.user)
   const { projects, project } = useSelectedProject()
   const [newProjectVisible, setNewProjectVisible] = useState(false)
+  const [searchParams, setSearchParams] = useSearchParams()
   const categoriesRef = useRef<HTMLDivElement>(null)
   const scrollToCategories = () => categoriesRef.current?.scrollIntoView({ behavior: 'smooth' })
+
+  const tabParam = searchParams.get('tab')
+  const tab: BudgetTab = isBudgetTab(tabParam) ? tabParam : 'overview'
+  const changeTab = (next: BudgetTab) => setSearchParams(next === 'overview' ? {} : { tab: next })
 
   if (projects === undefined) {
     return (
@@ -39,35 +51,52 @@ export function BudgetPage() {
 
   return (
     <div key={project.id} className="flex flex-col gap-4">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <BudgetSummaryCard
-          label="Total Allocated Budget"
-          amount={project.budgetTotal}
-          currencyCode={currencyCode}
-          onOpenDetails={scrollToCategories}
-        />
-        <BudgetSummaryCard
-          label="Total Actual Spent"
-          amount={project.totalSpent}
-          currencyCode={currencyCode}
-          onOpenDetails={scrollToCategories}
-        />
-        <BudgetSummaryCard
-          label="Remaining Balance"
-          amount={remainingBalance}
-          currencyCode={currencyCode}
-          onOpenDetails={scrollToCategories}
-          badge={{
-            label: remainingBalance >= 0 ? 'Positive Balance' : 'Over Budget',
-            tone: remainingBalance >= 0 ? 'positive' : 'negative',
-          }}
-        />
-      </div>
+      <BudgetTabs value={tab} onChange={changeTab} />
 
-      <div ref={categoriesRef}>
-        <CategoryBreakdownPanel projectId={project.id} currencyCode={currencyCode} />
-      </div>
-      <InvoicesPanel projectId={project.id} currencyCode={currencyCode} />
+      {tab === 'overview' ? (
+        <>
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <BudgetSummaryCard
+              label="Total Allocated Budget"
+              amount={project.budgetTotal}
+              currencyCode={currencyCode}
+              onOpenDetails={scrollToCategories}
+              className="border border-slate-200"
+            />
+            <BudgetSummaryCard
+              label="Total Actual Spent"
+              amount={project.totalSpent}
+              currencyCode={currencyCode}
+              onOpenDetails={scrollToCategories}
+              className="border border-slate-200"
+            />
+            <BudgetSummaryCard
+              label="Remaining Balance"
+              amount={remainingBalance}
+              currencyCode={currencyCode}
+              onOpenDetails={scrollToCategories}
+              className="border border-slate-200"
+              badge={{
+                label: remainingBalance >= 0 ? 'Positive Balance' : 'Over Budget',
+                tone: remainingBalance >= 0 ? 'positive' : 'negative',
+              }}
+            />
+          </div>
+
+          <div ref={categoriesRef}>
+            <CategoryBreakdownPanel projectId={project.id} currencyCode={currencyCode} />
+          </div>
+          <InvoicesPanel projectId={project.id} currencyCode={currencyCode} />
+        </>
+      ) : tab === 'purchase-orders' ? (
+        <PurchaseOrdersPanel projectId={project.id} currencyCode={currencyCode} />
+      ) : tab === 'change-orders' ? (
+        <ChangeOrdersPanel projectId={project.id} currencyCode={currencyCode} />
+      ) : tab === 'invoices' ? (
+        <InvoicesTabPanel projectId={project.id} currencyCode={currencyCode} />
+      ) : (
+        <ComingSoonPage title={BUDGET_TABS.find((t) => t.value === tab)?.label ?? ''} />
+      )}
     </div>
   )
 }

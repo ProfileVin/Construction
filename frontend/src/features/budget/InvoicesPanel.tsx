@@ -3,15 +3,11 @@ import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 import { Dialog } from 'primereact/dialog'
 import { useState } from 'react'
+import { pagerTemplate } from '../../components/pagerTemplate'
 import { formatCurrency } from '../../lib/format'
+import { InvoiceStatusBadge } from '../invoices/InvoiceStatusBadge'
 import { useInvoices } from './budget.hooks'
 import type { Invoice } from './budget.api'
-
-const STATUS_STYLES: Record<string, string> = {
-  Paid: 'bg-emerald-100 text-emerald-700',
-  Pending: 'bg-blue-100 text-blue-700',
-  Scheduled: 'bg-amber-100 text-amber-700',
-}
 
 const PAGE_SIZE = 8
 
@@ -28,7 +24,7 @@ export function InvoicesPanel({ projectId, currencyCode }: InvoicesPanelProps) {
   const showingCount = data ? Math.min(data.pageSize, data.items.length) : 0
 
   return (
-    <div className="rounded-2xl bg-white p-6 shadow-sm">
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
       <div>
         <h2 className="text-lg font-bold text-brand-ink">Recent Financial Invoices</h2>
         <p className="text-sm text-slate-500">Procurement orders &amp; material disbursements</p>
@@ -39,18 +35,28 @@ export function InvoicesPanel({ projectId, currencyCode }: InvoicesPanelProps) {
           value={data?.items ?? []}
           loading={isLoading}
           emptyMessage="No invoices yet."
-          className="min-w-[720px]"
+          className="app-table app-table--shaded min-w-[720px]"
           paginator
           lazy
           rows={PAGE_SIZE}
           first={(page - 1) * PAGE_SIZE}
           totalRecords={data?.totalCount ?? 0}
           onPage={(e) => setPage(Math.floor((e.first ?? 0) / PAGE_SIZE) + 1)}
+          paginatorTemplate={pagerTemplate}
+          paginatorLeft={
+            data && data.totalCount > 0 ? (
+              <span className="text-sm text-slate-600">
+                Showing {showingCount} of {data.totalCount} invoices
+              </span>
+            ) : undefined
+          }
         >
           <Column
             header="S.No"
             body={(_row: Invoice, opts) => opts.rowIndex + 1} // rowIndex already includes the page offset (BUG-006)
-            style={{ width: '4rem' }}
+            style={{ width: '5rem' }}
+            bodyClassName="text-center"
+            headerClassName="app-table__center"
           />
           <Column
             header="Invoice / Vendor"
@@ -66,14 +72,7 @@ export function InvoicesPanel({ projectId, currencyCode }: InvoicesPanelProps) {
             header="Amount"
             body={(row: Invoice) => formatCurrency(row.amount, currencyCode, { maximumFractionDigits: 2 })}
           />
-          <Column
-            header="Status"
-            body={(row: Invoice) => (
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[row.status]}`}>
-                {row.status}
-              </span>
-            )}
-          />
+          <Column header="Status" body={(row: Invoice) => <InvoiceStatusBadge status={row.status} />} />
           <Column
             header="Action"
             body={(row: Invoice) => (
@@ -87,11 +86,6 @@ export function InvoicesPanel({ projectId, currencyCode }: InvoicesPanelProps) {
             )}
           />
         </DataTable>
-        {data && data.totalCount > 0 && (
-          <p className="mt-2 text-sm text-slate-500">
-            Showing {showingCount} of {data.totalCount} invoices
-          </p>
-        )}
       </div>
 
       <Dialog
@@ -114,9 +108,7 @@ export function InvoicesPanel({ projectId, currencyCode }: InvoicesPanelProps) {
               {dayjs(selected.issuedDate).format('MMM D, YYYY')}
             </p>
             <div className="mt-1">
-              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${STATUS_STYLES[selected.status]}`}>
-                {selected.status}
-              </span>
+              <InvoiceStatusBadge status={selected.status} />
             </div>
           </div>
         )}

@@ -70,7 +70,20 @@ dotnet run
 | POST   | `/api/projects/{id}/tasks`   | bearer JWT  | Multipart create (`title`, `assigneeName`, `assignedDate`, `deadline`, optional `phaseId`, `status`, `attachment` ≤ 25 MB → stored as a project document); mirrors an activity-log row |
 | PUT    | `/api/projects/{id}/tasks/{taskId}` | bearer JWT | JSON edit (`title`, `assigneeName`, `deadline`, `phaseId` or null, `status`) → updated task. Deadline must be on or after the assigned date (400). A status change adds an activity-log row |
 | GET    | `/api/projects/{id}/activity-log` | bearer JWT | 20 most recent activity-log entries (`logNumber`, description, linked task title / assignee / phase name + number, `category`, `attachmentDocumentId`) |
-| POST   | `/api/projects/{id}/budget/invoices` | bearer JWT | Multipart "Record New Expense" (`vendorName` = title, optional `categoryId`, `amount` > 0, `status` = Pending/Paid/Scheduled, `issuedDate`, optional `referenceNumber` ≤ 40 replacing the generated `INV-{year}-{seq}`, `notes` ≤ 2000, `receipt` ≤ 25 MB → project document) → 201 invoice. Pending + Scheduled count as Committed POs |
+| POST   | `/api/projects/{id}/budget/invoices` | bearer JWT | Multipart "Record New Expense" (`vendorName` = title, optional `categoryId`, `amount` > 0, `status` = Pending/Paid/Scheduled, `issuedDate`, optional `referenceNumber` ≤ 40 replacing the generated `INV-{year}-{seq}`, `notes` ≤ 2000, `receipt` ≤ 25 MB → project document) → 201 invoice |
+| GET    | `/api/projects/{id}/budget/purchase-orders` | bearer JWT | Paged POs with line items (`search` matches PO#, vendor or item; `status` = Pending/Paid; `page`, `pageSize`), newest first |
+| GET    | `/api/projects/{id}/budget/purchase-orders/summary` | bearer JWT | `totalCommitted` (Pending + Paid), `pendingApprovals`, `disbursedToDate`, `unallocated` (budget − committed). The budget summary's `committedPOs` uses the same total |
+| POST   | `/api/projects/{id}/budget/purchase-orders` | bearer JWT | JSON create (`vendorName`, `lineItems` 1–50 × {`description`, `quantity` 1–100,000, `unitPrice` > 0}, optional `deliveryDate`, `notes` ≤ 2000) → 201 Pending PO numbered `PO-0001`… |
+| POST   | `/api/projects/{id}/budget/purchase-orders/{poId}/mark-paid` | bearer JWT | Pending → Paid → updated PO |
+| DELETE | `/api/projects/{id}/budget/purchase-orders/{poId}` | bearer JWT | 204; 409 when the PO is already Paid |
+| GET    | `/api/projects/{id}/budget/change-orders` | bearer JWT | Paged change orders (`search` matches CO#, description or reason; `status` = Pending/Approved/Rejected; `page`, `pageSize`), newest date first |
+| GET    | `/api/projects/{id}/budget/change-orders/summary` | bearer JWT | `totalChangeOrders` (Pending + Approved), `pendingApprovals`, `approved` |
+| POST   | `/api/projects/{id}/budget/change-orders` | bearer JWT | JSON create (`description` ≤ 500, `amount` > 0, `requestedDate`, optional `reason` ≤ 2000) → 201 Pending CO numbered `CO-0001`… |
+| POST   | `/api/projects/{id}/budget/change-orders/{coId}/approve` | bearer JWT | Pending → Approved → updated CO; 409 when not Pending |
+| POST   | `/api/projects/{id}/budget/change-orders/{coId}/reject` | bearer JWT | Pending → Rejected → updated CO; 409 when not Pending |
+| GET    | `/api/projects/{id}/budget/invoices` | bearer JWT | Paged invoices (optional `search` = invoice # or vendor, `status` = Pending/Paid/Scheduled; `page`, `pageSize`) |
+| GET    | `/api/projects/{id}/budget/invoices/summary` | bearer JWT | `totalContractValue` (budget + approved change orders), `totalBilledToDate`, `approvedInvoices` (Paid + Scheduled) |
+| POST   | `/api/projects/{id}/budget/invoices/{invoiceId}/mark-paid` | bearer JWT | → Paid → updated invoice |
 | POST   | `/api/projects/{id}/activity-log` | bearer JWT | Multipart "New Log" on a task (`taskId`, `category` = Framing/Structural/Finishing/Electrical/Mechanical/Plumbing, `assigneeName`, `note` ≤ 2000, optional `attachment` ≤ 25 MB → project document) → 201 numbered entry; 404 if the task isn't in the project |
 | PUT    | `/api/projects/{id}/activity-log/{entryId}` | bearer JWT | `{ "description": "…" }` (1–2000 chars) → updated entry |
 | GET    | `/api/projects/{id}/documents` | bearer JWT | Paged documents (`search`, `format`=Image/Pdf/Word/Spreadsheet/Other, `page`, `pageSize`) |

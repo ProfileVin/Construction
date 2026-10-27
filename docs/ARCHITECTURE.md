@@ -206,11 +206,36 @@ Config: `appsettings.json` — `ConnectionStrings:Default` (LocalDB), `Jwt:*`
 - **Details → Edit:** the details dialog owns the edit step. It hides itself and
   opens the form, and Save/Cancel closes both, so callers only pass the record
   (`TaskDetailsDialog` → `EditTaskDialog`, FEAT-020).
+- **In-page sub-tabs (Budget):** a `role="tablist"` bar whose active tab lives in a `?tab=`
+  search param, with the values and type guard in a `*.tabs.ts` file (ADR-0023).
+- **Row actions menu (Purchase Orders):** one PrimeReact `Menu popup` per table, toggled from each
+  row's ⋮ button, with the clicked row kept in state. A destructive item goes through
+  `confirmDialog` with a `<ConfirmDialog />` mounted once in the panel (`PurchaseOrdersTable`/`Panel`).
+- **Editable line-item grid:** `useFieldArray` plus `useWatch` for live line totals and the subtotal; pale-blue
+  `.po-line-input` fields; the header row is hidden below `sm` and each line stacks
+  (`NewPurchaseOrderDialog`). For `InputNumber` inside a form, wire **both** `onChange` (per keystroke) and
+  `onValueChange` (blur). With `onValueChange` alone the value only commits on blur, so a clearing
+  error shifts the layout mid-click.
+- **Parent/child aggregate (backend):** the parent owns a private `List<Child>` exposed as
+  `IReadOnlyList`, configured with `HasMany(...).WithOne()` + `UsePropertyAccessMode(Field)`. The child
+  cascades from the parent only, with no `ProjectId`, to avoid SQL Server's multiple-cascade-path error
+  (`PurchaseOrder`, ADR-0024).
+- **Approval-style lifecycle (backend):** the service checks `Status == Pending` and returns a status enum
+  (`Decided`/`NotFound`/`NotPending` → 200/404/409); the domain `Approve`/`Reject` methods also throw as a
+  guard. Approve and reject share one service method and one private controller helper (`ChangeOrder`, ADR-0025).
+- **"Inspect >" row action (Change Orders, Invoices):** `components/InspectLink` (`.inspect-link`, brand
+  green) opens a details dialog that owns the row's actions (Approve/Reject, Mark as Paid) and is updated
+  in place from the mutation's result (`onDecided`/`onPaid`).
+- **Status-grouped KPI sums:** repositories expose `GetTotalsAsync` → one `GROUP BY Status` query mapped to a
+  totals record with derived properties (`PurchaseOrderTotals`, `ChangeOrderTotals`, `InvoiceTotals`).
 - **Paginated DataTable S.No:** use `opts.rowIndex + 1`. PrimeReact's
   `rowIndex` already includes the paginator offset (BUG-006).
-- **List-page table look (Documents, Team):** `className="app-table"` on a lazy
+- **List-page table look (Documents, Team, Budget invoices):** `className="app-table"` on a lazy
   `DataTable` + `paginatorTemplate={pagerTemplate}` from
-  `components/pagerTemplate.tsx` ("← Previous 1 2 Next →", `.pager-nav`). Flat
+  `components/pagerTemplate.tsx` ("← Previous 1 2 Next →", `.pager-nav`). Add
+  `app-table--shaded` for a grey header with "Showing X of Y" in `paginatorLeft`. For a
+  list that isn't a table, use a standalone `Paginator` with `template={pagerTemplate}` and
+  `className="app-pager"` (Budget categories). Flat
   search field = `.flat-search`; a light-blue filter strip = `.toolbar-band`.
   Size PrimeReact `Dropdown`s with a wrapper `div` (`w-full sm:w-48`), because
   the unlayered global `.p-dropdown { width: 100% }` beats Tailwind width utilities.

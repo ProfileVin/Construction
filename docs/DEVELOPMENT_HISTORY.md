@@ -17,6 +17,180 @@ Entry template:
 
 ---
 
+## 2026-10-22 — Pin patched System.Security.Cryptography.Pkcs (BUG-014)
+**Refs:** BUG-014
+**What:** Added a direct `System.Security.Cryptography.Pkcs` 10.0.13 reference to `Construction.Infrastructure.csproj`,
+overriding the vulnerable 9.0.11 that `Microsoft.Data.SqlClient` 6.1.6 (via EF Core SqlServer 10.0.12) pulls in.
+Construction.Api gets it transitively.
+**Why:** The user reported the NU1902/NU1903 warnings on `dotnet run`. Both advisories (CVE-2026-70162,
+CVE-2026-84008, .NET DoS) are fixed in 10.0.13.
+**Files:** `backend/src/Construction.Infrastructure/Construction.Infrastructure.csproj`, `docs/BUGS.md`.
+**Verification:** `dotnet nuget why` resolves Pkcs 10.0.13 in both projects. `dotnet build -c Release` gives
+0 warnings and 0 errors. The Debug build compiled but couldn't copy outputs because the user's running API
+locked the Debug DLLs (MSB3021), so restart it to pick up the change.
+**Follow-ups:** Remove the pin when a SqlClient/EF Core update brings a patched Pkcs.
+
+## 2026-10-22 — Change Orders tab + Invoices tab (FEAT-026, FEAT-027)
+**Refs:** FEAT-026, FEAT-027, ADR-0025 (builds on FEAT-024/025, ADR-0023/0024; reuses FEAT-023's "Record New Expense")
+**What:**
+- **Backend — change orders:**
+  - Domain `ChangeOrder` (`ChangeOrderStatus { Pending, Approved, Rejected }`, `CO-{seq:0000}`, `Approve`/`Reject`
+    only from Pending). Migration `AddChangeOrders` (one table, unique `(ProjectId, Sequence)`).
+  - `Application/ChangeOrders/` (service, repository interface, DTOs, list query, create command, decision enums);
+    `Infrastructure/Repositories/ChangeOrderRepository` (LIKE search on CO#/description/reason, status filter, max + 1,
+    totals grouped by status).
+  - `Api/Features/ChangeOrders/` (controller at `…/budget/change-orders`: GET list, GET summary, POST,
+    POST `{id}/approve`, POST `{id}/reject` → 200/404/409), contracts and a FluentValidation validator.
+  - `DbSeeder.SeedChangeOrdersAsync` tops up 12 demo COs (4 Approved, 2 Rejected) for each project with none.
+- **Backend — invoices:**
+  - `Invoice.MarkPaid`.
+  - `InvoiceListQuery` (search + status) replaces page/pageSize on `IInvoiceRepository.SearchByProjectAsync` and
+    `IBudgetService.SearchInvoicesAsync`.
+  - New `GetAsync`/`GetTotalsAsync` on the repository.
+  - `BudgetService.GetInvoiceSummaryAsync` (budget + approved COs; all invoices; Paid + Scheduled) and
+    `MarkInvoicePaidAsync`.
+  - `BudgetController` gains `search`/`status` on `GET invoices`, plus `GET invoices/summary` and
+    `POST invoices/{id}/mark-paid`.
+  - `.http` samples and README rows added.
+- **Frontend:**
+  - `features/change-orders/`: api, hooks (mutations also invalidate `['invoices','summary']`), zod schema,
+    `ChangeOrdersPanel`, `ChangeOrdersTable`, `ChangeOrderDetailsDialog` (Reject/Approve), `NewChangeOrderDialog`,
+    `ChangeOrderStatusBadge`.
+  - `features/invoices/`: api, hooks, `InvoicesTabPanel` ("+ New Invoice" opens `NewExpenseDialog`),
+    `InvoicesTable`, `InvoiceDetailsDialog` (Open receipt, Mark as Paid), and `InvoiceStatusBadge`. The badge moved
+    out of `InvoicesPanel`, which now uses it.
+  - Shared `components/InspectLink` + `.inspect-link` CSS.
+  - `useCreateInvoice` also refreshes the Invoice tab.
+  - `BudgetPage` renders both panels; Payments/Reports stay "coming soon".
+**Why:** The user supplied the Change Order and Invoice tab mockups. Their choices are in ADR-0025:
+Pending/Approved/Rejected, "Inspect >" on every row, a simple create modal, and approval only feeding contract value.
+**Files:** `backend/src/Construction.Domain/Entities/{ChangeOrder.cs,Invoice.cs}`,
+`backend/src/Construction.Application/{ChangeOrders/*,Budget/{BudgetService,IBudgetService,IInvoiceRepository,InvoiceListQuery}.cs,DependencyInjection.cs}`,
+`backend/src/Construction.Infrastructure/{Persistence/AppDbContext.cs,Persistence/Migrations/*AddChangeOrders*,Repositories/{ChangeOrderRepository,InvoiceRepository}.cs,DependencyInjection.cs}`,
+`backend/src/Construction.Api/{Features/ChangeOrders/*,Features/Budget/{BudgetController,BudgetContracts}.cs,Common/DbSeeder.cs,Construction.Api.http}`,
+`README.md`, `frontend/src/features/{change-orders,invoices}/*`, `frontend/src/components/InspectLink.tsx`,
+`frontend/src/features/budget/{InvoicesPanel.tsx,budget.hooks.ts}`, `frontend/src/pages/BudgetPage.tsx`,
+`frontend/src/index.css`, `docs/{FEATURES,DECISIONS,ARCHITECTURE}.md`.
+**Verification:**
+- `npm run build` + `npm run lint` pass (only the existing >500 kB chunk warning). `dotnet build` passes with
+  0 errors; the only warnings are the existing NU1902/NU1903 advisories on `System.Security.Cryptography.Pkcs`.
+- `dotnet run` applied `AddChangeOrders` and seeded 12 COs per project.
+- curl:
+  - CO list, search "hvac", status=Pending and summary all correct.
+  - Create → 201 `CO-0013`. Approve → 200, then approve again → 409. Invalid create → 400 with
+    Amount/Description/RequestedDate errors. Unknown CO → 404.
+  - Invoice summary Total Contract Value went up by exactly the approved amount (Riverside: $850,000 + $23,603.17).
+  - Invoice search/status filters work. Mark-paid → 200 and Approved Invoices moved by the invoice amount.
+  - Overview `GET …/budget/summary` → 200.
+- `playwright-cli` (headless Chromium) at 1440 px on Riverside Villas:
+  - Both tabs match the mockups.
+  - Change Orders: page 2 shows 5 rows; "hvac" search → CO-0003, CO-0001; the Rejected filter shows only Rejected.
+  - Creating a CO through the modal shows the empty-form errors first, then saves CO-0013 dated today.
+  - Inspect → Approve switches the dialog to Approved; the Approved KPI and Total Contract Value went up by $500.
+  - Invoices: "curl" search shows 2 rows. Inspect → Mark as Paid hides the button.
+  - "+ New Invoice" opens "Record New Expense". Overview still renders.
+  - No console errors. At 375 px neither tab scrolls horizontally (the table scrolls inside its card).
+- The verification left test data in the dev DB: CO-0013 on both projects (approved), and invoices
+  `INV-2026-001` and `#CURL-001` on Riverside marked Paid.
+**Follow-ups:** Payments (FEAT-028) and Reports (FEAT-029) tabs. CO edit/delete and revert are not built.
+Approvals don't yet touch the schedule or the project budget (ADR-0025). The create-CO modal should be
+restyled if a mockup arrives.
+
+## 2026-10-21 — Purchase Orders tab + "Create Purchase Order" modal (FEAT-025)
+**Refs:** FEAT-025, ADR-0024 (builds on FEAT-024 / ADR-0023; supersedes the invoice-based Committed POs from FEAT-013/ADR-0022)
+**What:**
+- **Backend:**
+  - Domain `PurchaseOrder` (+ `PurchaseOrderLineItem`, `PurchaseOrderStatus { Pending, Paid }`) — the first
+    parent/child aggregate. Migration `AddPurchaseOrders`: two tables, PO-only cascade for lines, unique `(ProjectId, Sequence)`.
+  - `Application/PurchaseOrders/` (service, repository interface, DTOs with `ItemSummary`, commands/query, delete-status enum);
+    `Infrastructure/Repositories/PurchaseOrderRepository` (LIKE search on PO#/vendor/line description, status filter,
+    split-query paging, max + 1 sequence, totals grouped by status).
+  - `Api/Features/PurchaseOrders/` (controller at `…/budget/purchase-orders`: GET list, GET summary, POST, POST `{id}/mark-paid`,
+    DELETE → 204/404/409), contracts, and a FluentValidation validator with a per-line child validator.
+  - `BudgetService.GetSummaryAsync` `committedPOs` now equals the PO total.
+  - `DbSeeder.SeedPurchaseOrdersAsync` tops up 12 demo POs (5 Paid) for each project with none.
+  - `.http` samples and README rows added.
+- **Frontend:**
+  - `features/purchase-orders/`: api, hooks (every mutation also invalidates `['budget','summary']`), zod schema,
+    `PurchaseOrdersPanel` (header, 4 KPI cards via `BudgetSummaryCard`, Team-style `toolbar-band` search + status
+    dropdown), `PurchaseOrdersTable` (`app-table--shaded`, shared pager, "Showing X of Y purchase orders", 👁 + shared ⋮
+    `Menu popup`), `PurchaseOrderDetailsDialog`, `PurchaseOrderStatusBadge`, and `NewPurchaseOrderDialog`
+    (`useFieldArray` line grid, live totals/SUBTOTAL, stacked lines and buttons on phones).
+  - `ConfirmDialog` for delete.
+  - `BudgetSummaryCard`: `onOpenDetails` is now optional, and there's a new `fractionDigits` prop.
+  - `BudgetPage` renders the panel for `?tab=purchase-orders`.
+  - `index.css`: `.po-line-input`, `.po-menu-danger`.
+**Why:** The user supplied the Purchase Order tab and Create Purchase Order mockups. They chose Pending → Paid with
+⋮ Mark as Paid / Delete, POs as the source of Overview's Committed POs, and a line-item summary under the vendor.
+**Files:** `backend/src/Construction.Domain/Entities/PurchaseOrder.cs`,
+`backend/src/Construction.Application/{PurchaseOrders/*,Budget/BudgetService.cs,DependencyInjection.cs}`,
+`backend/src/Construction.Infrastructure/{Persistence/AppDbContext.cs,Persistence/Migrations/*AddPurchaseOrders*,Repositories/PurchaseOrderRepository.cs,DependencyInjection.cs}`,
+`backend/src/Construction.Api/{Features/PurchaseOrders/*,Common/DbSeeder.cs,Construction.Api.http}`, `README.md`,
+`frontend/src/features/purchase-orders/*`, `frontend/src/features/dashboard/BudgetSummaryCard.tsx`,
+`frontend/src/pages/BudgetPage.tsx`, `frontend/src/index.css`, `docs/{FEATURES,DECISIONS,ARCHITECTURE}.md`.
+**Verification:**
+- `npm run build` + `npm run lint` pass. `dotnet build -c Release` passes (0 errors).
+  - The Debug build compiles but couldn't copy outputs, because the user's running API (:5080) locks the Debug DLLs.
+  - The migration was generated with `--configuration Release`.
+- A second API instance (Release, Development env) was run on :5081. It applied the migration and seeded the demo POs.
+  - The first seed came from a build that predated the realistic item names. I rolled back to
+    `AddInvoiceNotesAndReceipt` with `dotnet ef database update` (dropping only the new PO tables) and re-seeded.
+- curl against :5081:
+  - List: 12 seeded rows. Search "wire" and status=Paid filtered correctly.
+  - Summary = budget summary `committedPOs` (64,047.70).
+  - Create with 3 lines → 201 `PO-0013`, total 35,900, summary "Electrical materials +2 more".
+  - Empty/invalid body → 400 with vendor + per-line messages; no lines → "Add at least one line item."
+  - Mark paid moved Disbursed/Committed. Delete Paid → 409; delete Pending → 204.
+  - Unknown PO / foreign project → 404.
+- Standalone `playwright-core` (MCP bridge not connected) on the user's Vite (:5173), with `/api` re-routed to :5081:
+  - 1440 px matches both mockups.
+  - Paging (8 of 11 → page 2), search "lumber" → PO-0010, Paid filter, and 👁 details dialog all work.
+  - ⋮ Mark as Paid flips the badge and moves the Pending/Disbursed KPIs.
+  - ⋮ Delete shows "Delete PO-0013? This can't be undone." and removes the row.
+  - Empty submit shows "Vendor is required" / "Item is required".
+  - Three lines give totals $20,000 / $7,500 / $8,400 and SUBTOTAL $35,900; removing one gives $28,400.
+  - Create → `PO-0015` appears first, and Overview Committed POs = Total Committed ($75,063.67).
+  - At 375 px there's no page or dialog overflow.
+- The run found a real bug, now fixed: `InputNumber` with only `onValueChange` commits on blur. After a failed submit,
+  the cleared error shifted "Add item" mid-click and the click missed. Both inputs now also wire `onChange`.
+  The 375 px pass also showed a clipped "Create Purchase Order" button, so the actions now stack below `sm`.
+- The test runs left extra dev data on the first project: PO-0013–0015 created, some POs marked Paid, some deleted.
+**Follow-ups:** The user's :5080 API must be restarted to serve the new endpoints (it's still the pre-change build).
+Possible next steps: edit a PO / its line items, a real approval status, a PO → invoice link, and FEAT-026–029.
+
+## 2026-10-21 — Budget & Finance redesign: sub-tabs, category pager, invoices restyle (FEAT-024)
+**Refs:** FEAT-024, FEAT-025–029 (new backlog), ADR-0023 (builds on FEAT-013 / FEAT-023)
+**What:**
+- New `features/budget/BudgetTabs.tsx` + `budget.tabs.ts`: a `role="tablist"` bar on a teal-bordered
+  track with equal segments. The active segment is brand-filled with its `pi` icon. It scrolls horizontally on phones.
+- `BudgetPage`: the tab comes from `?tab=` (`useSearchParams`, first use in the repo). Overview shows the
+  existing cards + panels; the other tabs show `ComingSoonPage`. The summary cards are outlined.
+- `BudgetSummaryCard` gains an optional `className` (Dashboard usage unchanged).
+- `CategoryBreakdownPanel`: outlined; paged on the client, 5 per page, with a standalone `Paginator` + `pagerTemplate`
+  (shown only when there are more than 5 categories). Colour index = absolute index.
+- `InvoicesPanel`: outlined; `app-table app-table--shaded` + `pagerTemplate`; "Showing X of Y invoices" moved
+  into `paginatorLeft`; S.No centred.
+- `index.css`: `.app-pager.p-paginator` shares the `.app-table` pager rules. New `.app-table--shaded` adds a grey
+  header (#e9eaec) and pushes the left content to the left edge (Documents/Team pagers unchanged).
+**Why:** The user supplied a new Budget page mockup. They chose placeholder sub-tabs and a URL-backed tab.
+**Files:** `frontend/src/pages/BudgetPage.tsx`,
+`frontend/src/features/budget/{BudgetTabs.tsx,budget.tabs.ts,CategoryBreakdownPanel.tsx,InvoicesPanel.tsx}`,
+`frontend/src/features/dashboard/BudgetSummaryCard.tsx`, `frontend/src/index.css`,
+`docs/{FEATURES,DECISIONS,ARCHITECTURE}.md`.
+**Verification:**
+- `npm run build` + `npm run lint` pass (the first lint run flagged `only-export-components`, which was fixed by moving
+  the constants to `budget.tabs.ts`); `dotnet build` passes (0 errors).
+- Standalone `playwright-core` script (the MCP bridge wasn't connected), demo user, `/budget` at 1440 px:
+  - Overview is active by default. Clicking Reports changes the URL to `?tab=reports` and shows the coming-soon panel; a reload keeps
+    Reports; Back returns to `/budget` + Overview; `?tab=bogus` falls back to Overview.
+  - Invoices header computes `rgb(233, 234, 236)`; "Showing 1 of 1 invoices" is on the pager row.
+  - At 375 px there is no page overflow, and the tablist scrolls horizontally.
+- No seeded project has budget categories or more than 3 invoices, so a second run stubbed `…/budget/summary` (7
+  categories) and `…/budget/invoices` (20) with `page.route`. Categories page 1 shows 5 rows and page 2 shows the other 2; invoices
+  show "Showing 8 of 20" → page 2 starts at S.No 9 → page 3 shows "Showing 4 of 20" starting at S.No 17.
+**Follow-ups:** FEAT-025–029 (the real tab content). The mockup's "… 18" ellipsis page link isn't rendered
+(PrimeReact `PageLinks` has none; Documents/Team match).
+
 ## 2026-10-13 — Compact "Record New Expense" modal (BUG-013)
 **Refs:** BUG-013, FEAT-023
 **What:**

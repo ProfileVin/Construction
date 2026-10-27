@@ -59,6 +59,12 @@ public record InvoiceDto(
         i.Amount, i.Status, i.IssuedDate, i.CreatedAt, i.Notes, i.ReceiptDocumentId);
 }
 
+public record InvoiceSummaryResponse(decimal TotalContractValue, decimal TotalBilledToDate, decimal ApprovedInvoices)
+{
+    public static InvoiceSummaryResponse From(Construction.Application.Budget.InvoiceSummaryDto s) =>
+        new(s.TotalContractValue, s.TotalBilledToDate, s.ApprovedInvoices);
+}
+
 public record BudgetSummaryResponse(
     IReadOnlyList<CategoryDto> Categories,
     decimal TotalAllocated,

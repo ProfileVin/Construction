@@ -2,6 +2,7 @@ using Construction.Api.Common;
 using Construction.Application.Budget;
 using Construction.Application.Dashboard;
 using Construction.Application.Documents;
+using Construction.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -30,7 +31,12 @@ public class BudgetController(IBudgetService budgetService) : ControllerBase
 
     [HttpGet("invoices")]
     public async Task<IResult> SearchInvoicesAsync(
-        Guid projectId, [FromQuery] int page, [FromQuery] int pageSize, CancellationToken cancellationToken)
+        Guid projectId,
+        [FromQuery] string? search,
+        [FromQuery] InvoiceStatus? status,
+        [FromQuery] int page,
+        [FromQuery] int pageSize,
+        CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (userId is null)
@@ -38,8 +44,8 @@ public class BudgetController(IBudgetService budgetService) : ControllerBase
             return Results.Unauthorized();
         }
 
-        var result = await budgetService.SearchInvoicesAsync(
-            userId, projectId, page <= 0 ? 1 : page, pageSize <= 0 ? 8 : pageSize, cancellationToken);
+        var query = new InvoiceListQuery(search, status, page <= 0 ? 1 : page, pageSize <= 0 ? 8 : pageSize);
+        var result = await budgetService.SearchInvoicesAsync(userId, projectId, query, cancellationToken);
 
         if (result is null)
         {
@@ -48,6 +54,32 @@ public class BudgetController(IBudgetService budgetService) : ControllerBase
 
         return Results.Ok(new PagedResponse<InvoiceDto>(
             result.Items.Select(InvoiceDto.From).ToList(), result.TotalCount, result.Page, result.PageSize));
+    }
+
+    [HttpGet("invoices/summary")]
+    public async Task<IResult> GetInvoiceSummaryAsync(Guid projectId, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var summary = await budgetService.GetInvoiceSummaryAsync(userId, projectId, cancellationToken);
+        return summary is null ? Results.NotFound() : Results.Ok(InvoiceSummaryResponse.From(summary));
+    }
+
+    [HttpPost("invoices/{invoiceId:guid}/mark-paid")]
+    public async Task<IResult> MarkInvoicePaidAsync(Guid projectId, Guid invoiceId, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var invoice = await budgetService.MarkInvoicePaidAsync(userId, projectId, invoiceId, cancellationToken);
+        return invoice is null ? Results.NotFound() : Results.Ok(InvoiceDto.From(invoice));
     }
 
     [HttpPost("invoices")]

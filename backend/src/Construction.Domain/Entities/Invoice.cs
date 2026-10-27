@@ -71,4 +71,15 @@ public class Invoice
             UpdatedAt = nowUtc,
         };
     }
+
+    public void MarkPaid(DateTime nowUtc)
+    {
+        if (Status == InvoiceStatus.Paid)
+        {
+            return;
+        }
+
+        Status = InvoiceStatus.Paid;
+        UpdatedAt = nowUtc;
+    }
 }

@@ -16,6 +16,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
     public DbSet<Invoice> Invoices => Set<Invoice>();
 
+    public DbSet<PurchaseOrder> PurchaseOrders => Set<PurchaseOrder>();
+
+    public DbSet<PurchaseOrderLineItem> PurchaseOrderLineItems => Set<PurchaseOrderLineItem>();
+
+    public DbSet<ChangeOrder> ChangeOrders => Set<ChangeOrder>();
+
     public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
 
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
@@ -121,6 +127,50 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .WithMany()
                 .HasForeignKey(i => i.CategoryId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        builder.Entity<PurchaseOrder>(entity =>
+        {
+            entity.Property(o => o.PoNumber).HasMaxLength(40).IsRequired();
+            entity.Property(o => o.VendorName).HasMaxLength(200).IsRequired();
+            entity.Property(o => o.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(o => o.TotalAmount).HasColumnType("decimal(18,2)");
+            entity.Property(o => o.IssuedDate).HasColumnType("date");
+            entity.Property(o => o.DeliveryDate).HasColumnType("date");
+            entity.Property(o => o.Notes).HasMaxLength(2000);
+            entity.HasIndex(o => new { o.ProjectId, o.Sequence }).IsUnique();
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(o => o.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Lines cascade from the PO only (no ProjectId) — a second path from Project would be rejected by SQL Server.
+            entity.HasMany(o => o.LineItems)
+                .WithOne()
+                .HasForeignKey(l => l.PurchaseOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.Navigation(o => o.LineItems).UsePropertyAccessMode(PropertyAccessMode.Field);
+        });
+
+        builder.Entity<PurchaseOrderLineItem>(entity =>
+        {
+            entity.Property(l => l.Description).HasMaxLength(200).IsRequired();
+            entity.Property(l => l.UnitPrice).HasColumnType("decimal(18,2)");
+            entity.Ignore(l => l.LineTotal);
+        });
+
+        builder.Entity<ChangeOrder>(entity =>
+        {
+            entity.Property(c => c.CoNumber).HasMaxLength(40).IsRequired();
+            entity.Property(c => c.Description).HasMaxLength(500).IsRequired();
+            entity.Property(c => c.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(c => c.RequestedDate).HasColumnType("date");
+            entity.Property(c => c.Reason).HasMaxLength(2000);
+            entity.HasIndex(c => new { c.ProjectId, c.Sequence }).IsUnique();
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(c => c.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
 
         builder.Entity<ProjectDocument>(entity =>

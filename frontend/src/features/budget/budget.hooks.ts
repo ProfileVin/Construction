@@ -25,6 +25,9 @@ export function useCreateInvoice(projectId: string | undefined) {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['budget', 'summary', projectId] })
       qc.invalidateQueries({ queryKey: ['budget', 'invoices', projectId] })
+      // The Invoice tab's list and KPIs (FEAT-027).
+      qc.invalidateQueries({ queryKey: ['invoices', 'list', projectId] })
+      qc.invalidateQueries({ queryKey: ['invoices', 'summary', projectId] })
       // A receipt is stored as a project document.
       qc.invalidateQueries({ queryKey: ['documents', 'search', projectId] })
       qc.invalidateQueries({ queryKey: ['documents', 'counts', projectId] })

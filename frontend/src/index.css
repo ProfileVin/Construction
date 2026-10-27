@@ -352,6 +352,27 @@ body {
   color: #1d4ed8;
   text-decoration: underline;
 }
+/* "Inspect >" row action on the Change Order / Invoice tables (FEAT-026/027). */
+.inspect-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-brand);
+}
+.inspect-link .pi {
+  font-size: 0.9rem;
+}
+.inspect-link:hover {
+  text-decoration: underline;
+}
+.inspect-link:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
 
 /* Paginator (Task Log / invoices). Lara-teal's active page sets text = background (#0f766e),
    hiding the number — visible since BUG-005 stopped preflight clearing button backgrounds. */
@@ -439,15 +460,24 @@ body {
   padding-top: 1rem;
   padding-bottom: 1rem;
 }
-.app-table .p-paginator {
+.app-table .p-paginator,
+.app-pager.p-paginator {
   justify-content: flex-end;
   gap: 0.25rem;
   padding: 1rem 0 0;
 }
-.app-table .p-paginator .p-paginator-page {
+.app-table .p-paginator .p-paginator-page,
+.app-pager.p-paginator .p-paginator-page {
   border-radius: 10px;
   color: var(--color-brand-ink);
   font-weight: 600;
+}
+/* Invoices (FEAT-024): grey header row, and "Showing X of Y" (paginatorLeft) opposite the pager */
+.app-table--shaded .p-datatable-thead > tr > th {
+  background: #e9eaec;
+}
+.app-table--shaded .p-paginator .p-paginator-left-content {
+  margin-right: auto;
 }
 .pager-nav {
   display: inline-flex;
@@ -592,6 +622,27 @@ body {
 }
 .form-dialog .p-inputtext.log-description.p-invalid {
   border-color: #dc2626;
+}
+/* "Create Purchase Order" (FEAT-025) line-item inputs: pale-blue filled, borderless until hovered/invalid.
+   `.form-dialog .p-inputtext` would otherwise win on specificity. */
+.form-dialog .p-inputtext.po-line-input {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #eef3fb;
+  padding: 0.6rem 0.85rem;
+  font-size: 15px;
+  color: #0f172a;
+}
+.form-dialog .p-inputtext.po-line-input:enabled:hover {
+  border-color: #d5e1f3;
+}
+.form-dialog .p-inputtext.po-line-input.p-invalid {
+  border-color: #dc2626;
+}
+/* PO row ⋮ menu: destructive item in red */
+.p-menu .po-menu-danger .p-menuitem-text,
+.p-menu .po-menu-danger .p-menuitem-icon {
+  color: #b91c1c;
 }
 /* "New Log" (FEAT-022): single-select Construction Phase chips — pale blue, brand fill when picked. */
 .log-chip {

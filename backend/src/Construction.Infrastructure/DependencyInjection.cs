@@ -1,8 +1,10 @@
 using Construction.Application.Budget;
+using Construction.Application.ChangeOrders;
 using Construction.Application.Common;
 using Construction.Application.Dashboard;
 using Construction.Application.Documents;
 using Construction.Application.Projects;
+using Construction.Application.PurchaseOrders;
 using Construction.Application.Schedule;
 using Construction.Application.Team;
 using Construction.Infrastructure.Identity;
@@ -29,6 +31,8 @@ public static class DependencyInjection
         services.AddScoped<IActivityLogRepository, ActivityLogRepository>();
         services.AddScoped<IBudgetCategoryRepository, BudgetCategoryRepository>();
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
+        services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
+        services.AddScoped<IChangeOrderRepository, ChangeOrderRepository>();
         services.AddScoped<IProjectDocumentRepository, ProjectDocumentRepository>();
         services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
         services.AddScoped<IUserDirectory, UserDirectory>();

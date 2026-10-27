@@ -643,3 +643,79 @@ number with the vendor beneath. The user chose the mappings below.
 the SPA and the seeder, which goes through the service. Generated numbers still use
 count + 1, so a typed reference that happens to look like `INV-…` could duplicate a later
 generated number. This is accepted for now.
+
+## ADR-0023 — Budget sub-tabs in a `?tab=` search param; placeholders; client-side category paging
+**Status:** Accepted (2026-10-21)
+**Context:** The new Budget & Finance mockup adds six sub-tabs (Overview, Purchase Order,
+Change Order, Invoice, Payments, Reports) and paginates the category list. Only Overview
+has a backend today. The user chose placeholder tabs and a linkable tab.
+**Decision:**
+- **The active tab is a `?tab=` search param on `/budget`** (`useSearchParams`), not nested
+  routes. Overview is the default and drops the param; unknown values fall back to Overview.
+  Switching tabs pushes a history entry, so Back returns to the previous tab. The sidebar's
+  `/budget` link and the project `key` remount stay as they are.
+- **Non-Overview tabs render the shared `ComingSoonPage`**, with one backlog row each (FEAT-025–029).
+- **Categories are paged on the client** (5 per page, standalone `Paginator` with
+  `pagerTemplate`), because `GET …/budget/summary` already returns every category and the
+  totals need them all anyway. Colours keep the unpaginated index, so a category's colour
+  doesn't depend on the page.
+- **The tab values and the `isBudgetTab` guard live in `features/budget/budget.tabs.ts`**,
+  not in the component file, so oxlint's fast-refresh rule stays clean.
+**Consequences:** If a sub-tab grows its own sub-pages, moving to nested routes
+(`/budget/purchase-orders/:id`) would replace the param. Old `?tab=` links would need a redirect.
+
+## ADR-0024 — Purchase orders: first parent/child aggregate, max+1 numbering, Pending-only delete, POs feed Committed POs
+**Status:** Accepted (2026-10-21)
+**Context:** The Purchase Order tab mockup (FEAT-025) needs POs with line items, four KPIs and per-row
+actions. The user chose a Pending → Paid lifecycle (⋮ = Mark as Paid / Delete), a line-item summary as
+the second line under the vendor, and that Overview's "Committed POs" should come from real POs.
+**Decision:**
+- **`PurchaseOrder` is an aggregate that owns `PurchaseOrderLineItem`s**: a private `List<>` backing field
+  exposed as `IReadOnlyList`, `HasMany(...).WithOne()` with field access. It is the first child collection
+  in Domain. Lines cascade from the PO only and carry no `ProjectId`, so SQL Server sees a single cascade path.
+  `TotalAmount` is computed once at creation (lines are immutable) and stored so KPI sums run in SQL.
+- **Numbering:** `PO-{Sequence:0000}`, with `Sequence` = max + 1 per project and a unique
+  `(ProjectId, Sequence)` index. Unlike invoices' count + 1, deleting an older PO can't produce a duplicate.
+  If the newest PO is deleted, its number is handed out again. There is no retry on a concurrent-create
+  collision: the unique index rejects it, and the Application layer has no EF reference to catch it.
+- **Only Pending POs can be deleted.** A Paid PO has been disbursed, so `DELETE` returns 409 and the UI hides ⋮ on Paid rows.
+- **KPIs:** Total Committed = Pending + Paid; Pending Approvals = Pending; Disbursed To Date = Paid;
+  Unallocated = `Project.BudgetTotal` − Total Committed (may be negative).
+- **The budget summary's `committedPOs` now uses the same PO total.** This supersedes the invoice proxy
+  (Pending + Scheduled invoices) from FEAT-013/ADR-0022. Scheduled invoices no longer affect it.
+- **Issue date** = the creation date (the modal has no issue-date field); the delivery date is optional.
+- JSON body (no attachment). The endpoints live under `…/budget/purchase-orders` in their own
+  `PurchaseOrdersController` / `IPurchaseOrderService`.
+**Consequences:** Projects without POs show $0 Committed POs on Overview even when unpaid invoices exist.
+Line items can't be edited after creation (no edit flow yet). A real approval step can be added later
+as a new status between Pending and Paid.
+
+## ADR-0025 — Change orders: Pending → Approved/Rejected, approvals extend contract value only; invoice KPIs
+**Status:** Accepted (2026-10-22)
+**Context:** The Change Order and Invoice tab mockups (FEAT-026/027) were built from the PO tab and carry
+copy-paste errors. The CO table shows Paid/Pending badges, but a KPI says "Approved". Both "+ New" buttons
+say "New Purchase Order", and the Invoice page is titled "Change Orders". Invoice row 1 has 👁 + ⋮ while the other rows say
+"Inspect >". The CO subtitle says approved changes "update schedule and billing automatically", and there is
+no create-CO mockup. The user chose: Pending/Approved/Rejected, "Inspect >" on every row, a simple create
+modal, and approvals that reach contract value only.
+**Decision:**
+- **`ChangeOrder` is a flat entity** (no line items) with PO-style numbering: `CO-{Sequence:0000}`, max + 1,
+  unique `(ProjectId, Sequence)`. Only a Pending CO can be approved or rejected. The service answers 409 for any other;
+  the domain methods also throw as a guard. There is no delete or edit yet.
+- **CO KPIs:** Total Change Order = Pending + Approved (Rejected never reaches the contract); Pending
+  Approvals = Pending; Approved = Approved.
+- **Approval only feeds the Invoice tab's Total Contract Value** = `Project.BudgetTotal` + approved CO total.
+  `BudgetTotal` isn't changed, so Overview, Dashboard and the PO tab's Unallocated don't move. The schedule isn't
+  touched. The mockup subtitle is kept as-is.
+- **Invoice KPIs:** Total Billed to Date = all invoices; Approved Invoices = Paid + Scheduled (both approved
+  for payment). Invoices gain `MarkPaid` (no-op when already Paid), exposed on the details dialog for Pending and
+  Scheduled rows.
+- **"Inspect >" is the row action on both new tables** (shared `components/InspectLink` + `.inspect-link`),
+  opening a details dialog that owns the actions. The PO tab keeps 👁 + ⋮.
+- **The Invoice tab is a separate panel** (`features/invoices/`) over the extended `GET …/budget/invoices`
+  (optional `search`/`status`); the Overview's `InvoicesPanel` is left as the "recent invoices" view.
+  "+ New Invoice" reuses "Record New Expense" (ADR-0022) rather than adding a second invoice form.
+- Mockup copy fixes: "New Change Order", "Invoices", "New Invoice", and a new Invoice subtitle.
+**Consequences:** `BudgetService` now depends on `IChangeOrderRepository`. If approvals should later raise
+the budget or shift phases, that's a new decision (it would move many existing KPIs). Approved/rejected COs
+can't be reverted. Like POs, there's no retry on a concurrent-create sequence collision.

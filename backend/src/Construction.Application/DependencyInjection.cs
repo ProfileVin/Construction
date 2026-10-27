@@ -1,7 +1,9 @@
 using Construction.Application.Budget;
+using Construction.Application.ChangeOrders;
 using Construction.Application.Dashboard;
 using Construction.Application.Documents;
 using Construction.Application.Projects;
+using Construction.Application.PurchaseOrders;
 using Construction.Application.Schedule;
 using Construction.Application.TaskLog;
 using Construction.Application.Team;
@@ -20,6 +22,8 @@ public static class DependencyInjection
         services.AddScoped<IScheduleService, ScheduleService>();
         services.AddScoped<ITaskLogService, TaskLogService>();
         services.AddScoped<IBudgetService, BudgetService>();
+        services.AddScoped<IPurchaseOrderService, PurchaseOrderService>();
+        services.AddScoped<IChangeOrderService, ChangeOrderService>();
         services.AddScoped<IDocumentService, DocumentService>();
         services.AddScoped<ITeamService, TeamService>();
 
