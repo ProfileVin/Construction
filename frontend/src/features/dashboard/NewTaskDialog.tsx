@@ -3,10 +3,12 @@ import dayjs from 'dayjs'
 import { Button } from 'primereact/button'
 import { Calendar } from 'primereact/calendar'
 import { Dialog } from 'primereact/dialog'
+import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { Controller, useForm } from 'react-hook-form'
+import { usePhases } from '../schedule/schedule.hooks'
 import { useCreateProjectTask } from './dashboard.hooks'
-import { createTaskSchema, type CreateTaskValues } from './dashboard.schema'
+import { createTaskSchema, taskStatusOptions, type CreateTaskValues } from './dashboard.schema'
 
 interface NewTaskDialogProps {
   projectId: string
@@ -16,6 +18,7 @@ interface NewTaskDialogProps {
 
 export function NewTaskDialog({ projectId, visible, onHide }: NewTaskDialogProps) {
   const createTask = useCreateProjectTask(projectId)
+  const { data: phases } = usePhases(projectId)
 
   const {
     control,
@@ -24,7 +27,7 @@ export function NewTaskDialog({ projectId, visible, onHide }: NewTaskDialogProps
     formState: { errors },
   } = useForm<CreateTaskValues>({
     resolver: zodResolver(createTaskSchema),
-    defaultValues: { title: '', assigneeName: '' },
+    defaultValues: { title: '', assigneeName: '', phaseId: null, status: 'Upcoming' },
   })
 
   const submit = handleSubmit(async (values) => {
@@ -33,6 +36,8 @@ export function NewTaskDialog({ projectId, visible, onHide }: NewTaskDialogProps
       assigneeName: values.assigneeName,
       assignedDate: dayjs(values.assignedDate).format('YYYY-MM-DD'),
       deadline: dayjs(values.deadline).format('YYYY-MM-DD'),
+      phaseId: values.phaseId ?? null,
+      status: values.status,
     })
     reset()
     onHide()
@@ -136,6 +141,52 @@ export function NewTaskDialog({ projectId, visible, onHide }: NewTaskDialogProps
           {errors.deadline && (
             <small className="text-[13px] text-red-600">{errors.deadline.message}</small>
           )}
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-col gap-2">
+            <label htmlFor="phaseId" className="text-[15px] font-semibold text-slate-800">
+              Phase
+            </label>
+            <Controller
+              name="phaseId"
+              control={control}
+              render={({ field }) => (
+                <Dropdown
+                  inputId="phaseId"
+                  value={field.value ?? null}
+                  options={(phases ?? []).map((p) => ({ label: p.name, value: p.id }))}
+                  optionLabel="label"
+                  optionValue="value"
+                  placeholder="No phase"
+                  showClear
+                  onChange={(e) => field.onChange(e.value)}
+                  className="w-full"
+                />
+              )}
+            />
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <label htmlFor="status" className="text-[15px] font-semibold text-slate-800">
+              Status
+            </label>
+            <Controller
+              name="status"
+              control={control}
+              render={({ field }) => (
+                <Dropdown
+                  inputId="status"
+                  value={field.value}
+                  options={taskStatusOptions as unknown as { label: string; value: string }[]}
+                  optionLabel="label"
+                  optionValue="value"
+                  onChange={(e) => field.onChange(e.value)}
+                  className="w-full"
+                />
+              )}
+            />
+          </div>
         </div>
 
         {createTask.isError && (

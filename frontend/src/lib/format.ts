@@ -10,3 +10,16 @@ export function formatCurrency(
     ...options,
   }).format(amount)
 }
+
+/** Compact size label, e.g. `42.3MB` / `812KB`. */
+export function formatFileSize(bytes: number): string {
+  const units = ['B', 'KB', 'MB', 'GB']
+  let value = bytes
+  let unit = 0
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024
+    unit++
+  }
+  const digits = unit === 0 || value >= 100 ? 0 : 1
+  return `${value.toFixed(digits)}${units[unit]}`
+}

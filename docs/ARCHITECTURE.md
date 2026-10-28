@@ -70,11 +70,16 @@ them:
    files left anywhere.
 2. **Layering — piloted, not universal.** As of ADR-0010, the backend is
    **Clean Architecture, piloted on Projects + Dashboard only**.
-   Auth/Onboarding/Reference deliberately still use the old flat pattern
-   (controller action → `AppDbContext`/`UserManager` directly) — a tracked,
-   temporary inconsistency, not an oversight. When touching those areas,
-   follow the *old pattern* below; when touching Projects/Dashboard (or adding
-   a new piloted area), follow the *new pattern*.
+   Features/Auth, Features/Onboarding, Features/Reference deliberately still
+   use the old flat pattern (controller action → `AppDbContext`/`UserManager`
+   directly) — a tracked, temporary inconsistency, not an oversight. When
+   touching those areas, follow the *old pattern* below; when touching
+   Features/Projects, Features/Dashboard (or adding a new piloted area),
+   follow the *new pattern*.
+3. **Folder grouping.** As of ADR-0013, the five feature areas live under
+   `Construction.Api/Features/<area>/`. Top-level `Construction.Api/Auth/`
+   is not a feature folder — it holds only global JWT/Identity plumbing
+   (`JwtOptions.cs`, `JwtTokenService.cs`) that `Program.cs` wires up.
 
 ```
 backend/
@@ -112,9 +117,10 @@ backend/
                    hosting types only trivially available in the Web-SDK Api
                    project.
     Construction.Api/               Web SDK; references Domain + Application +
-                                     Infrastructure directly (Auth/Onboarding/
-                                     Reference still need AppDbContext/
-                                     ApplicationUser out-of-pilot-scope).
+                                     Infrastructure directly (Features/Auth,
+                                     Features/Onboarding, Features/Reference
+                                     still need AppDbContext/ApplicationUser
+                                     out-of-pilot-scope).
       Program.cs   DI wiring (AddInfrastructure + AddApplication +
                    AddControllers), CORS ("spa" — :5173/:5174), Serilog, JWT
                    bearer, Identity, health checks, OpenAPI + Scalar (Dev),
@@ -142,11 +148,17 @@ backend/
                    UserManager<ApplicationUser> for user provisioning +
                    IProjectService/IDashboardService for everything else — no
                    direct entity creation).
-      Auth/, Onboarding/, Reference/   OLD LAYERING PATTERN — controller
+      Auth/        GLOBAL JWT/IDENTITY PLUMBING ONLY (not a feature folder;
+                   see ADR-0013) — JwtOptions.cs (bound from the `Jwt` config
+                   section), JwtTokenService.cs (issues tokens; consumed by
+                   Features/Auth/AuthController.cs).
+      Features/    Feature areas, each with its own `*Controller.cs`,
+                   `*Contracts.cs`, `*Validator.cs` (ADR-0013):
+        Auth/, Onboarding/, Reference/   OLD LAYERING PATTERN — controller
                    action injects AppDbContext/UserManager<ApplicationUser>
                    directly, business rules inline in the action. Unchanged
                    this pass (routing style did change — see ADR-0011).
-      Projects/, Dashboard/           NEW LAYERING PATTERN — see below.
+        Projects/, Dashboard/           NEW LAYERING PATTERN — see below.
 ```
 
 No automated test project exists (`Construction.Application.Tests` was added
@@ -160,8 +172,30 @@ Config: `appsettings.json` — `ConnectionStrings:Default` (LocalDB), `Jwt:*`
 **Frontend:**
 - **New API call:** add a typed function in a `features/<x>/<x>.api.ts` using the
   shared `api` client; wrap in a `useQuery`/`useMutation` hook in the same folder.
+- **File upload / download (FEAT-014, ADR-0015):** the shared client defaults to
+  `Content-Type: application/json`, so a `FormData` POST **must** pass
+  `headers: { 'Content-Type': 'multipart/form-data' }`. Otherwise axios
+  JSON-serializes the form. Authed file endpoints can't be plain `<a href>`s:
+  fetch with `responseType: 'blob'` and open or download via an object URL
+  (`lib/download.ts` `downloadBlob(blob, fileName)`; used by Documents and the
+  Team CSV export). Backend file bytes go through
+  `IFileStorage` (`FileStorage:RootPath`), never direct `File.*` calls in
+  services.
+- **Paginated DataTable S.No:** use `opts.rowIndex + 1`. PrimeReact's
+  `rowIndex` already includes the paginator offset (BUG-006).
+- **List-page table look (Documents, Team):** `className="app-table"` on a lazy
+  `DataTable` + `paginatorTemplate={pagerTemplate}` from
+  `components/pagerTemplate.tsx` ("← Previous 1 2 Next →", `.pager-nav`). Flat
+  search field = `.flat-search`; a light-blue filter strip = `.toolbar-band`.
+  Size PrimeReact `Dropdown`s with a wrapper `div` (`w-full sm:w-48`), because
+  the unlayered global `.p-dropdown { width: 100% }` beats Tailwind width utilities.
+  For the same reason, Tailwind `border-0`/`p-0` can't strip a `.p-inputtext`.
+  For a bordered search box with an icon, use `.search-field` on the wrapper
+  (Dropdown-sized; the wrapper owns the border and focus ring) (BUG-008).
 - **Auth state:** read via `useAuthStore(selector)`; never store the token
   elsewhere. Gate routes with `<ProtectedRoute>`.
+- **UI preferences** (e.g. sidebar collapsed): `stores/uiStore.ts` (zustand +
+  persist, `construction-ui`). The selected project lives in `stores/projectStore.ts`.
 - **Forms:** React Hook Form + `zodResolver(<schema>)`; wrap every PrimeReact
   input in `<Controller>`; surface field errors as `<small>` and request-level
   errors from the mutation via a `getXErrorMessage(error)` helper. For live field
@@ -177,7 +211,7 @@ Config: `appsettings.json` — `ConnectionStrings:Default` (LocalDB), `Jwt:*`
 - Every area is an `[ApiController]` class: `[Route("api/<area>")]` at class
   level, `[HttpGet]`/`[HttpPost]`/`[HttpPut]`("<sub-route>") per action,
   `[Authorize]` at class level when every action needs auth (Onboarding,
-  Projects, Dashboard) or per-action when mixed (Auth's `me` vs
+  Projects, Dashboard) or per-action when mixed (Features/Auth's `me` vs
   register/login). Dependencies are constructor-injected (primary
   constructor) — controllers are instantiated per request, so scoped services
   (`AppDbContext`, `UserManager`, an Application service) inject cleanly.
@@ -189,7 +223,7 @@ Config: `appsettings.json` — `ConnectionStrings:Default` (LocalDB), `Jwt:*`
   use the inherited `User` property and let `FluentValidationFilter` handle
   validation.
 
-**Backend — new layered pattern (Projects/Dashboard; use for any new area):**
+**Backend — new layered pattern (Features/Projects, Features/Dashboard; use for any new area):**
 - **New entity or invariant:** add to `Construction.Domain/Entities/` with
   private setters + a static `Create(...)` factory that throws on invalid
   input — this is the single place the invariant is enforced (DbSeeder and the
@@ -213,9 +247,9 @@ Config: `appsettings.json` — `ConnectionStrings:Default` (LocalDB), `Jwt:*`
   command, call the service, map the result DTO → the Api's own DTO, return
   `Results.X` (`null` service result → `Results.NotFound()`).
 
-**Backend — old layering pattern (Auth/Onboarding/Reference; not yet
-migrated to Application/Infrastructure — routing style is still the shared
-Controller pattern above):**
+**Backend — old layering pattern (Features/Auth, Features/Onboarding,
+Features/Reference; not yet migrated to Application/Infrastructure — routing
+style is still the shared Controller pattern above):**
 - The controller action injects `AppDbContext`/`UserManager<ApplicationUser>`
   directly and contains the business logic inline; projects to DTOs with the
   entity's own static `DtoType.From(entity)`. No `IValidator<T>` parameter or

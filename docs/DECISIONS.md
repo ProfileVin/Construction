@@ -359,3 +359,112 @@ to that layer falls back to manual/live checks (as used throughout this
 session) unless a test project is reintroduced later. This does not revert
 ADR-0010's layering decision (Domain/Application/Infrastructure split,
 repository interfaces, entity factories) — only the test project is gone.
+
+## ADR-0013 — Construction.Api: group feature folders under `Features/`; split `Auth/`
+**Status:** Accepted (2026-09-14)
+**Context:** `Construction.Api` kept `Auth/`, `Dashboard/`, `Onboarding/`,
+`Projects/`, `Reference/` as flat top-level folders alongside `Common/` and
+`Properties/`. The user wanted feature slices visually/structurally grouped
+under one `Features/` folder, distinct from cross-cutting concerns
+(`Common/`) and genuinely global identity/JWT wiring (`Auth/`).
+**Decision:** Moved `Dashboard/`, `Onboarding/`, `Projects/`, `Reference/`
+wholesale into `Features/<name>/`. Split `Auth/`: `AuthController.cs`,
+`Contracts.cs`, `LoginRequestValidator.cs`, `RegisterRequestValidator.cs`
+(the login/register feature, same shape as the other controllers) moved to
+`Features/Auth/`; `JwtOptions.cs` and `JwtTokenService.cs` (bound/consumed
+directly by `Program.cs`'s JWT bearer + DI setup) stayed at top-level `Auth/`
+as global identity plumbing. Every moved file's `namespace` line changed
+from `Construction.Api.<X>` to `Construction.Api.Features.<X>` (all files use
+file-scoped `namespace` syntax, one segment per folder level — no
+`.csproj`/`.slnx` changes needed since the project has no explicit
+`<Compile>` globs and the solution only references `.csproj` paths).
+**Consequences:** `Auth/JwtTokenService.cs` now references `UserDto`/
+`LoginResponse` in `Construction.Api.Features.Auth` while itself staying in
+`Construction.Api.Auth` — a two-way reference between the two Auth
+namespaces (legal C#, same assembly), an accepted side effect of splitting
+identity plumbing from the login/register feature rather than moving `Auth/`
+wholesale. `Common/` and `Properties/` are unaffected. `dotnet build` is
+clean (0 warnings/errors); files were moved with `git mv` to preserve blame
+history.
+
+## ADR-0014 — Explicit CSS cascade-layer order: Tailwind preflight below PrimeReact
+**Status:** Accepted (2026-09-23)
+**Context:** PrimeReact's Lara theme is emitted inside `@layer primereact`.
+`index.css` `@import`s it before `tailwindcss`, so `primereact` was the first
+layer declared — i.e. the *lowest* priority — and Tailwind v4 preflight
+(`@layer base`: `button { color: inherit; background: transparent }`,
+`* { margin: 0 }`) silently overrode the theme. Every filled button rendered
+dark text on the brand fill with the icon flush against the label (BUG-005).
+**Decision:** Declare the order once, first thing in `index.css`:
+`@layer theme, base, primereact, components, utilities;`. Preflight now sits
+below the theme; Tailwind `components`/`utilities` still sit above it, so
+utility classes keep overriding PrimeReact (the original reason for the
+import order). Unlayered rules in `index.css` beat every layer, so the
+existing brand overrides are unaffected.
+**Consequences:** PrimeReact components now get their full theme styling,
+which also exposed theme defects preflight had been masking — fixed with
+unlayered overrides in `index.css`: the Lara-teal paginator's active page
+(text = background colour) and SelectButton options inheriting the global
+filled-button rule. New PrimeReact components should be visually checked
+against the theme, not against preflight-reset defaults. Any new `@layer`
+must be added to this declaration in the intended position.
+
+## ADR-0015 — Document storage: local disk behind `IFileStorage`, authed blob access
+**Status:** Accepted (2026-09-23)
+**Context:** The Document page (FEAT-014) needs real upload / open / download of
+drawings and permits (mockup shows files up to ~61 MB). Options were local
+disk, SQL `varbinary`, or metadata-only placeholders. The user chose local
+disk with a 100 MB per-file cap.
+**Decision:**
+- File bytes go to disk via an Application-layer `IFileStorage` interface;
+  Infrastructure's `LocalFileStorage` writes under `FileStorage:RootPath`
+  (default `App_Data/uploads`, resolved against the Api content root,
+  gitignored). Metadata lives in the `ProjectDocuments` table.
+- Storage keys are server-generated (`{projectId:N}/{documentId:N}{ext}`) and
+  never come from user input. `LocalFileStorage` also refuses any key that
+  resolves outside the root.
+- Upload limits: 100 MB (`DocumentUploadRules.MaxSizeBytes`, enforced by
+  `[RequestSizeLimit]`/`[RequestFormLimits]` + the FluentValidation
+  validator + the client zod schema) and an extension allow-list (images,
+  PDF, Word, Excel/CSV, DWG/DXF, TXT, ZIP). Format (Image/Pdf/Word/
+  Spreadsheet/Other) is derived from the extension.
+- The uploader's display name is snapshotted on the row (same choice as the
+  task assignee string, ADR-0009). Application gets it through a small
+  `IUserDirectory` so it never references Identity.
+- The content endpoint needs the bearer token, so the SPA fetches files as
+  blobs (`responseType: 'blob'`) and opens or downloads them via object URLs,
+  not plain `<a href>`s.
+**Consequences:** Uploads work on a single API instance. Scaling out, or
+hosting where the disk isn't persistent, needs a blob-store `IFileStorage`
+(Azure Blob / S3), which only changes one DI line. Blob fetches load the whole
+file into browser memory, which is fine at 100 MB. Streaming very large files
+would need short-lived signed URLs. There's no delete or rename endpoint yet.
+
+## ADR-0016 — Team members: a project-scoped directory, not user accounts
+**Status:** Accepted (2026-09-23)
+**Context:** The Team page (FEAT-015) lists the people on a project, with
+role/trade, email, assigned phase, active-task count and Active/Deactivated
+status, plus "Invite Team Member" and "Export". Tasks already store their
+assignee as a free-text name (ADR-0009). The user chose: *Invite = add a member
+record (no email sent, no login)* and *Active Tasks = open tasks whose assignee
+name matches the member*.
+**Decision:**
+- New `TeamMember` entity per project (not an `ApplicationUser`). Email is
+  unique per project (lower-cased, unique index `(ProjectId, Email)`), and a
+  duplicate returns 409. Deactivating is a status flag, not a delete.
+- `ActiveTaskCount` is computed at read time: non-`Completed` `ProjectTask`s
+  grouped by `AssigneeName`, matched to `FullName` case-insensitively. It is
+  never stored, and tasks keep their free-text assignee.
+- Export is server-side CSV (`GET …/team/export`, same filters, unpaged). Cells
+  are RFC-4180 quoted, and a cell starting with `= + - @` (or tab/CR) gets a
+  leading `'` so spreadsheets don't evaluate it (CSV injection). A UTF-8 BOM is
+  written so Excel reads accents correctly.
+- `DbSeeder` gets an idempotent **top-up** step that runs every startup and
+  seeds 12 sample members into any demo-user project that has none. The main
+  seed only runs for a brand-new demo user, so existing dev DBs would never
+  have received the sample data otherwise.
+**Consequences:** Renaming a member (or a task's assignee) silently changes the
+count, because there's no FK between tasks and members. Moving to a real
+`AssigneeMemberId` FK later is a data migration (match names once). Members
+can't log in. Turning an invite into an account needs an email/invite-token
+flow (FEAT-005-style) that links a `TeamMember` to an `ApplicationUser`.

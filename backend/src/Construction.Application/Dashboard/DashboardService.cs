@@ -1,5 +1,6 @@
 using Construction.Application.Common;
 using Construction.Application.Projects;
+using Construction.Application.Schedule;
 using Construction.Domain.Entities;
 
 namespace Construction.Application.Dashboard;
@@ -7,6 +8,7 @@ namespace Construction.Application.Dashboard;
 public class DashboardService(
     IProjectRepository projects,
     IProjectTaskRepository tasks,
+    IConstructionPhaseRepository phases,
     IActivityLogRepository activityLog,
     IUnitOfWork unitOfWork,
     TimeProvider timeProvider) : IDashboardService
@@ -20,7 +22,12 @@ public class DashboardService(
         }
 
         var items = await tasks.ListByProjectAsync(projectId, cancellationToken);
-        return items.Select(ProjectTaskDto.From).ToList();
+        var phaseNames = (await phases.ListByProjectAsync(projectId, cancellationToken))
+            .ToDictionary(p => p.Id, p => p.Name);
+
+        return items
+            .Select(t => ProjectTaskDto.From(t, t.PhaseId is { } phaseId && phaseNames.TryGetValue(phaseId, out var name) ? name : null))
+            .ToList();
     }
 
     public async Task<ProjectTaskDto?> CreateTaskAsync(
@@ -37,7 +44,8 @@ public class DashboardService(
 
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
         var task = ProjectTask.Create(
-            projectId, command.Title, command.AssigneeName, command.AssignedDate, command.Deadline, nowUtc);
+            projectId, command.Title, command.AssigneeName, command.AssignedDate, command.Deadline,
+            command.PhaseId, command.Status, nowUtc);
 
         await tasks.AddAsync(task, cancellationToken);
         await activityLog.AddAsync(
@@ -50,7 +58,15 @@ public class DashboardService(
 
         await unitOfWork.SaveChangesAsync(cancellationToken);
 
-        return ProjectTaskDto.From(task);
+        string? phaseName = null;
+        if (task.PhaseId is { } taskPhaseId)
+        {
+            var phase = (await phases.ListByProjectAsync(projectId, cancellationToken))
+                .FirstOrDefault(p => p.Id == taskPhaseId);
+            phaseName = phase?.Name;
+        }
+
+        return ProjectTaskDto.From(task, phaseName);
     }
 
     public async Task<IReadOnlyList<ActivityLogEntryDto>?> ListActivityLogAsync(
