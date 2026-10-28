@@ -17,6 +17,264 @@ Entry template:
 
 ---
 
+## 2026-09-23 — Fix onboarding options 404 (BUG-004); browser check of /budget; file BUG-005
+**Refs:** BUG-004, BUG-005, FEAT-013
+**What:** `getOnboardingOptions()` (`frontend/src/features/onboarding/onboarding.api.ts`)
+now calls `GET /api/reference/options` instead of the never-mapped
+`/api/onboarding/options` — the same fix pattern as BUG-003; the reference
+response is a superset of `OnboardingOptions`, so no client-side reshaping.
+README endpoint table: replaced the phantom `/api/onboarding/options` and
+`/api/projects/options` rows with the real `/api/reference/options`. Also did
+the FEAT-013 follow-up browser check of `/budget`, which surfaced BUG-005
+(app-wide PrimeReact button text/icon styling lost to Tailwind preflight
+because of CSS layer order) — filed, not fixed.
+**Why:** BUG-004 broke the very first onboarding step; FEAT-013's history entry
+asked for a real-browser check of `/budget`.
+**Files:** `frontend/src/features/onboarding/onboarding.api.ts`, `README.md`,
+`docs/BUGS.md`.
+**Verification:** Playwright (headless Chromium, scripted — the MCP browser
+bridge wasn't connected) logged in as the demo user: `/onboarding` and
+`/onboarding/company` at 1440 px and 375 px — all four dropdowns populated
+(timezone auto-detected), zero console errors / API 4xx (previously a 404 on
+`/api/onboarding/options`). `/budget` at 1440 px and 375 px — renders, no
+horizontal page scroll (invoice table scrolls within its card on mobile), no
+console errors. `cd frontend && npm run build && npm run lint` pass (only the
+pre-existing >500 kB chunk warning); `cd backend && dotnet build` passes (built
+to an alternate `-o` dir because the running API locked the default output).
+**Follow-ups:** BUG-005. `/budget` was only seen in its empty state — the
+demo user's active project predates the budget seed data, so the populated
+category bars / invoice rows still haven't been viewed in a browser.
+
+---
+
+## 2026-09-23 — Budget & Finance page: category breakdown + invoices (FEAT-013)
+**Refs:** FEAT-013
+**What:** Built the `/budget` page end-to-end, replacing its `ComingSoonPage`
+stub, from a user-supplied mockup. Backend: new `BudgetCategory`
+(`Construction.Domain/Entities/BudgetCategory.cs` — name, allocated/spent
+amounts, `IsContingency` bool) and `Invoice` (`InvoiceStatus` enum,
+vendor, category FK, amount, issued date) entities + migration
+`AddBudgetCategoriesAndInvoices`. New `Construction.Application/Budget/`
+(`IBudgetService`/`BudgetService`) and `Construction.Api/Features/Budget/`
+(`BudgetController`: `GET /summary`, `GET/POST /invoices`), following the
+same Clean Architecture pilot pattern and `Features/<Area>/` convention as
+FEAT-011/012. Reused FEAT-012's generic `PagedResult<T>`/`PagedResponse<T>`
+for the invoices list rather than inventing a second pagination shape.
+Added `IProjectRepository.GetForOwnerAsync` (`ProjectRepository.cs`) — the
+first single-project fetch method; previously only `ListByOwnerAsync`/
+`ExistsForOwnerAsync` existed, but the summary needs `Project.BudgetTotal`/
+`TotalSpent` for the three top stat cards. **Derived-metric definitions**
+(user confirmed "reasonable approximations", no PO subsystem): Committed
+POs = sum of Pending invoices; Unbilled Work =
+`max(0, sum(category.SpentAmount) - sum(invoice.Amount))`; Contingency
+Burn % = spend/allocated on the one category flagged `IsContingency`,
+labeled Healthy (≤50%) / Watch (≤80%) / At Risk (>80%). Frontend: new
+`frontend/src/features/budget/` (`budget.api.ts`/`.hooks.ts`/`.schema.ts`,
+`CategoryProgressRow`/`CategoryBreakdownPanel` — single percent-width bars,
+5-color fixed palette, no shared-timeline math needed unlike Schedule's
+Gantt bars — `InvoicesPanel` reusing `TaskLogTable`'s `paginator`/`lazy`
+pattern, `NewExpenseDialog`). Extended `BudgetSummaryCard.tsx` (shared with
+Dashboard) with an optional `badge` prop for the Remaining Balance card's
+Positive/Over Budget pill — existing Dashboard usages unaffected since it's
+optional. "Open Details" on the three stat cards scrolls to the category
+panel (`scrollIntoView`) rather than being a dead click, since there's
+nowhere else on this page for them to navigate to.
+**Why:** User-requested feature, same mockup-driven full-stack approach as
+FEAT-011/012 in the same session (resumed after a ~week gap — session
+picked back up on 2026-09-23). User explicitly confirmed full-stack and the
+derived-metric approximations before implementation, since neither is
+obviously derivable from the mockup alone (no purchase-order concept exists
+anywhere in this app).
+**Files:** `backend/src/Construction.Domain/Entities/{BudgetCategory,Invoice}.cs`
+(new); `backend/src/Construction.Infrastructure/Persistence/AppDbContext.cs`,
+`Repositories/{BudgetCategoryRepository,InvoiceRepository,ProjectRepository}.cs`;
+`backend/src/Construction.Application/Budget/*` (new),
+`Projects/IProjectRepository.cs`; `backend/src/Construction.Api/Features/Budget/*`
+(new), `Common/{PagedResponse.cs,DbSeeder.cs}`; migration
+`Persistence/Migrations/20260915140937_AddBudgetCategoriesAndInvoices.cs`;
+`frontend/src/features/budget/*` (new),
+`frontend/src/features/dashboard/BudgetSummaryCard.tsx`,
+`frontend/src/pages/BudgetPage.tsx` (new), `frontend/src/router/index.tsx`.
+**Verification:** `cd backend && dotnet build` — 0 warnings/errors.
+`cd frontend && npm run build && npm run lint` — clean. **Migration FK
+lesson from FEAT-011 applied proactively this time**: `Invoice.CategoryId →
+BudgetCategory` used `DeleteBehavior.ClientSetNull` from the start (both
+`BudgetCategories` and `Invoices` cascade-delete from `Projects`, so a
+DB-level `SET NULL` would hit the same "multiple cascade paths" SQL Server
+error already fixed once — confirmed the generated migration has no
+`onDelete` param on that FK, i.e. `NoAction` at the DB level). Live API
+smoke test hit a snag: a `Construction.Api.exe` process left running from
+before this session's ~week-long gap was serving requests against a
+pre-migration database (`Invalid object name 'BudgetCategories'`/`'Invoices'`)
+— not a code bug, just a stale process; the user is restarting it, full
+summary/invoices verification pending that. Did not visually verify the
+page in a browser — no Playwright browser extension available in this
+environment, same limitation as FEAT-011/012.
+**Follow-ups:** No "add category" UI — categories are seed-only this pass
+(`BudgetService.CreateCategoryAsync` exists but isn't wrapped in a
+controller endpoint). Someone should open `/budget` in a real browser to
+confirm layout, once the stale dev-server process is cycled and the live
+smoke test completes.
+
+---
+
+## 2026-09-14 — Task Log page: filterable, paginated task table (FEAT-012)
+**Refs:** FEAT-012
+**What:** Built the `/task-log` page end-to-end, replacing its `ComingSoonPage`
+stub, from a user-supplied mockup (distinct from the Schedule mockup — this
+one has Assignee/Logged Date columns, a filter toolbar, and pagination).
+Backend: this is the first pagination/filtering capability anywhere in the
+backend. New `Construction.Application/Common/PagedResult.cs` (generic
+envelope), `Dashboard/TaskListQuery.cs` (search/phase/status/date-range +
+page/pageSize), `IProjectTaskRepository.SearchByProjectAsync` (EF `Where` +
+`EF.Functions.Like` + `Skip`/`Take`, implemented in
+`ProjectTaskRepository.cs`). New `Construction.Application/TaskLog/ITaskLogService`
+and `Construction.Api/Features/TaskLog/TaskLogController` —
+**deliberately a separate `GET /api/projects/{id}/task-log` endpoint**, not a
+change to the existing `GET /tasks` (which Dashboard's `AssignedTasksPanel`
+and Schedule's `UpcomingDeadlinesPanel` already depend on as a bare array);
+keeping them separate avoided a breaking response-shape change to either
+existing consumer. No new domain entity/migration — purely a new
+query/filtering capability over the existing `ProjectTask` schema from
+FEAT-011. Frontend: new `frontend/src/features/task-log/` module
+(`taskLog.api.ts`/`.hooks.ts`, `TaskLogToolbar` — search + phase/status
+dropdowns + PrimeReact `Calendar selectionMode="range"` — `TaskLogTable`,
+`TaskLogPanel` owning filter/page state). `TaskLogTable` uses PrimeReact
+`DataTable`'s `paginator`/`lazy`/`totalRecords`/`onPage` (first use of
+DataTable pagination in this app). "New Log" reuses the existing
+`NewTaskDialog` unchanged (same component Schedule already extended with
+Phase/Status). **Refactor while building:** once a third call site
+(`TaskLogTable`) needed the "task details" dialog and status pill,
+extracted `StatusBadge` (moved `features/schedule/StatusBadge.tsx` →
+`components/StatusBadge.tsx`, updated its two existing importers) and a new
+shared `features/dashboard/TaskDetailsDialog.tsx` (deduplicated from
+`UpcomingDeadlinesPanel.tsx`'s inline `Dialog`, which now uses the shared
+component too).
+**Why:** User-requested feature, following the same mockup-driven,
+full-stack approach as Schedule (FEAT-011) in the same session, confirmed
+this mockup belongs to `/task-log` not `/schedule`.
+**Files:** `backend/src/Construction.Application/Common/PagedResult.cs`
+(new), `Dashboard/{TaskListQuery.cs,IProjectTaskRepository.cs}`,
+`Construction.Application/TaskLog/*` (new);
+`backend/src/Construction.Infrastructure/Repositories/ProjectTaskRepository.cs`;
+`backend/src/Construction.Api/Common/PagedResponse.cs` (new),
+`Features/TaskLog/TaskLogController.cs` (new);
+`frontend/src/components/StatusBadge.tsx` (moved),
+`frontend/src/features/dashboard/TaskDetailsDialog.tsx` (new),
+`frontend/src/features/task-log/*` (new), `frontend/src/pages/TaskLogPage.tsx`
+(new), `frontend/src/router/index.tsx`.
+**Verification:** `cd backend && dotnet build` — 0 warnings/errors.
+`cd frontend && npm run build && npm run lint` — clean. Live API smoke test
+against the running dev server: unfiltered paginated fetch (`pageSize=2`
+correctly returned 2 of 2 total), `status=Completed` filter (correctly
+returned only the 1 matching task), `search=footing` filter (correctly
+matched by title substring) — all three returned the correct
+`{items, totalCount, page, pageSize}` envelope shape. Did not visually
+verify the toolbar/table/pagination controls in a browser — no Playwright
+browser extension available in this environment, same limitation noted
+under FEAT-011.
+**Follow-ups:** Same as FEAT-011 — someone should open `/task-log` in a
+real browser to confirm the filter toolbar and paginated table render and
+behave as intended.
+
+---
+
+## 2026-09-14 — Schedule page: Construction Phases roadmap + Upcoming Deadlines (FEAT-011)
+**Refs:** FEAT-011
+**What:** Built the `/schedule` page end-to-end, replacing its `ComingSoonPage`
+stub, from a user-supplied mockup. Backend: new `ConstructionPhase` domain
+entity (`Construction.Domain/Entities/ConstructionPhase.cs` — name, date
+range, percent complete, `PhaseStatus` enum, checkpoint label) + migration
+`AddConstructionPhasesAndTaskPhaseStatus`; `ProjectTask` gained a nullable
+`PhaseId` FK to `ConstructionPhase` and a `ProjectTaskStatus` enum. New
+`Construction.Application/Schedule/` (`IScheduleService`/`ScheduleService`,
+`IConstructionPhaseRepository`) and `Construction.Api/Features/Schedule/`
+(`ScheduleController`: `GET/POST /api/projects/{id}/phases`), following the
+Projects/Dashboard piloted layering (ADR-0010) and `Features/<Area>/` folder
+convention (ADR-0013). `DashboardService.ListTasksAsync`/`CreateTaskAsync`
+extended to resolve/pass through `PhaseId`/`PhaseName`/`Status` on
+`ProjectTaskDto`. Frontend: new `frontend/src/features/schedule/` module
+(`schedule.api.ts`/`.hooks.ts`/`.schema.ts`, `StatusBadge`,
+`phaseTimeline.utils.ts` date-math helpers, `PhaseRow`/`PhaseTimelinePanel`
+— a hand-rolled Tailwind Gantt bar, no new npm dependency —
+`NewMilestoneDialog`, `UpcomingDeadlinesPanel` reusing the existing
+`AssignedTasksPanel`/`RecentLogPanel` DataTable + dialog patterns). Extended
+`dashboard.api.ts`'s `ProjectTask` type and `NewTaskDialog`/`dashboard.schema.ts`
+with Phase/Status fields rather than duplicating the type. `DbSeeder.cs`
+seeds 5 phases + links the 8 existing seeded tasks to them (only applies to a
+fresh demo user with zero projects — existing seeded projects from prior
+sessions don't retroactively get phases).
+**Why:** User-requested feature, built from two mockups shown mid-session —
+clarified that the first ("Task Log" table with filters/pagination) was a
+different, out-of-scope page (`/task-log`, still a stub), and the second
+("Construction Phases" + "Upcoming Deadlines") was the actual `/schedule`
+target. User explicitly chose full-stack (real schema) over a frontend-only
+mock-data pass.
+**Files:** `backend/src/Construction.Domain/Entities/ConstructionPhase.cs`
+(new), `ProjectTask.cs`; `backend/src/Construction.Infrastructure/Persistence/AppDbContext.cs`,
+`Repositories/ConstructionPhaseRepository.cs` (new); `backend/src/Construction.Application/Schedule/*`
+(new), `Dashboard/{ProjectTaskDto,CreateProjectTaskCommand,DashboardService}.cs`;
+`backend/src/Construction.Api/Features/Schedule/*` (new),
+`Features/Dashboard/{DashboardContracts,DashboardController,CreateProjectTaskRequestValidator}.cs`,
+`Common/DbSeeder.cs`; migration
+`Persistence/Migrations/20260914124520_AddConstructionPhasesAndTaskPhaseStatus.cs`;
+`frontend/src/features/schedule/*` (new), `frontend/src/features/dashboard/{dashboard.api,dashboard.schema,NewTaskDialog}.tsx`,
+`frontend/src/pages/SchedulePage.tsx` (new), `frontend/src/router/index.tsx`.
+**Verification:** `cd backend && dotnet build` — 0 warnings/errors.
+`cd frontend && npm run build && npm run lint` — clean. Live API smoke test
+(login → create phase → create task linked to that phase → list both):
+confirmed `phaseName` correctly resolves on the task list response. **Found
+and fixed a real bug during live verification**: the initial migration's
+`ProjectTasks.PhaseId → ConstructionPhases` FK with `OnDelete(SetNull)` made
+SQL Server reject it ("may cause cycles or multiple cascade paths") because
+`ConstructionPhases` and `ProjectTasks` both already cascade-delete from
+`Projects` — switched to `DeleteBehavior.ClientSetNull` (no DB-level ON
+DELETE action; EF nulls the FK client-side for tracked entities instead),
+removed and regenerated the migration. Could **not** visually verify the
+Gantt rendering in a browser — no Playwright browser extension available in
+this environment; only the API contract and TS/build correctness were
+confirmed, not pixel-level rendering.
+**Follow-ups:** Day/Week/Month/Quarter zoom toggle is UI-only (doesn't
+re-bucket the chart yet). No delete/update endpoints for phases or tasks
+(list/create only, matching the existing tasks endpoint's scope). Someone
+should open `/schedule` in a real browser to confirm the Gantt bars render
+as intended — not yet done this session.
+
+---
+
+## 2026-09-14 — Construction.Api: group feature folders under Features/ (ADR-0013)
+**Refs:** ADR-0013
+**What:** Moved `Dashboard/`, `Onboarding/`, `Projects/`, `Reference/` (16
+files total, `git mv`) into a new `Features/<name>/` wrapper folder under
+`Construction.Api`. Split `Auth/`: `AuthController.cs`, `Contracts.cs`,
+`LoginRequestValidator.cs`, `RegisterRequestValidator.cs` moved to
+`Features/Auth/`; `JwtOptions.cs`/`JwtTokenService.cs` stayed at top-level
+`Auth/` as global JWT/Identity setup. Updated the `namespace` line in all 16
+moved files (`Construction.Api.<X>` → `Construction.Api.Features.<X>`) and
+fixed 5 `using` statements that crossed the split: `Program.cs` (added
+`using Construction.Api.Features.Auth;` alongside the existing
+`Construction.Api.Auth` for `LoginRequestValidator`),
+`Features/Auth/AuthController.cs` (added `using Construction.Api.Auth;` for
+`JwtTokenService`), `Auth/JwtTokenService.cs` (added
+`using Construction.Api.Features.Auth;` for `UserDto`/`LoginResponse`),
+`Features/Onboarding/OnboardingController.cs` (swapped `Construction.Api.Auth`
+→ `Construction.Api.Features.Auth`), `Features/Onboarding/OnboardingValidators.cs`
+(swapped `Construction.Api.Reference` → `Construction.Api.Features.Reference`).
+**Why:** User-requested folder reorg to visually/structurally group feature
+slices apart from cross-cutting `Common/` and global `Auth/` identity
+plumbing (see their shared target-layout diagram).
+**Files:** `backend/src/Construction.Api/Features/**` (new, 16 moved files),
+`backend/src/Construction.Api/Auth/JwtTokenService.cs`,
+`backend/src/Construction.Api/Program.cs`; `docs/DECISIONS.md` (ADR-0013).
+**Verification:** `cd backend && dotnet build` — 0 warnings, 0 errors.
+`git status` confirmed all 16 files tracked as renames (blame preserved).
+Grepped for stale `Construction.Api.Auth`/`.Reference`/`.Dashboard`/`.Onboarding`/`.Projects`
+references in `Features/` — only the one intentional `Construction.Api.Auth`
+using in `AuthController.cs` remained.
+**Follow-ups:** None — purely structural, no behavior/HTTP contract change.
+
+---
+
 ## 2026-09-12 — Remove Construction.Application.Tests (ADR-0012)
 **Refs:** FEAT-009, ADR-0012
 **What:** Deleted `backend/tests/Construction.Application.Tests/` entirely

@@ -20,6 +20,11 @@ public class ProjectRepository(AppDbContext db) : IProjectRepository
         return await db.Projects.AnyAsync(p => p.Id == projectId && p.OwnerId == ownerId, cancellationToken);
     }
 
+    public async Task<Project?> GetForOwnerAsync(Guid projectId, string ownerId, CancellationToken cancellationToken)
+    {
+        return await db.Projects.FirstOrDefaultAsync(p => p.Id == projectId && p.OwnerId == ownerId, cancellationToken);
+    }
+
     public Task AddAsync(Project project, CancellationToken cancellationToken)
     {
         db.Projects.Add(project);

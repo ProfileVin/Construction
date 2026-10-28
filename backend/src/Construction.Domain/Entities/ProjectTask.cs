@@ -1,5 +1,12 @@
 namespace Construction.Domain.Entities;
 
+public enum ProjectTaskStatus
+{
+    Upcoming,
+    InProgress,
+    Completed,
+}
+
 public class ProjectTask
 {
     public Guid Id { get; private set; }
@@ -8,6 +15,8 @@ public class ProjectTask
     public string AssigneeName { get; private set; } = string.Empty;
     public DateOnly AssignedDate { get; private set; }
     public DateOnly Deadline { get; private set; }
+    public Guid? PhaseId { get; private set; }
+    public ProjectTaskStatus Status { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -21,6 +30,8 @@ public class ProjectTask
         string assigneeName,
         DateOnly assignedDate,
         DateOnly deadline,
+        Guid? phaseId,
+        ProjectTaskStatus status,
         DateTime nowUtc)
     {
         if (string.IsNullOrWhiteSpace(title))
@@ -46,6 +57,8 @@ public class ProjectTask
             AssigneeName = assigneeName.Trim(),
             AssignedDate = assignedDate,
             Deadline = deadline,
+            PhaseId = phaseId,
+            Status = status,
             CreatedAt = nowUtc,
             UpdatedAt = nowUtc,
         };

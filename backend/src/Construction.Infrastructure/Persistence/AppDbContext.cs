@@ -10,6 +10,12 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
 
+    public DbSet<ConstructionPhase> ConstructionPhases => Set<ConstructionPhase>();
+
+    public DbSet<BudgetCategory> BudgetCategories => Set<BudgetCategory>();
+
+    public DbSet<Invoice> Invoices => Set<Invoice>();
+
     public DbSet<ActivityLogEntry> ActivityLogEntries => Set<ActivityLogEntry>();
 
     public DbSet<LookupOption> LookupOptions => Set<LookupOption>();
@@ -41,11 +47,63 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             entity.Property(t => t.AssigneeName).HasMaxLength(200).IsRequired();
             entity.Property(t => t.AssignedDate).HasColumnType("date");
             entity.Property(t => t.Deadline).HasColumnType("date");
+            entity.Property(t => t.Status).HasConversion<string>().HasMaxLength(40)
+                .HasDefaultValue(ProjectTaskStatus.Upcoming);
             entity.HasIndex(t => t.ProjectId);
+            entity.HasIndex(t => t.PhaseId);
             entity.HasOne<Project>()
                 .WithMany()
                 .HasForeignKey(t => t.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<ConstructionPhase>()
+                .WithMany()
+                .HasForeignKey(t => t.PhaseId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        builder.Entity<ConstructionPhase>(entity =>
+        {
+            entity.Property(p => p.Name).HasMaxLength(200).IsRequired();
+            entity.Property(p => p.CheckpointLabel).HasMaxLength(300);
+            entity.Property(p => p.StartDate).HasColumnType("date");
+            entity.Property(p => p.EndDate).HasColumnType("date");
+            entity.Property(p => p.Status).HasConversion<string>().HasMaxLength(40);
+            entity.HasIndex(p => p.ProjectId);
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(p => p.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<BudgetCategory>(entity =>
+        {
+            entity.Property(c => c.Name).HasMaxLength(200).IsRequired();
+            entity.Property(c => c.AllocatedAmount).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
+            entity.Property(c => c.SpentAmount).HasColumnType("decimal(18,2)").HasDefaultValue(0m);
+            entity.HasIndex(c => c.ProjectId);
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(c => c.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        builder.Entity<Invoice>(entity =>
+        {
+            entity.Property(i => i.InvoiceNumber).HasMaxLength(40).IsRequired();
+            entity.Property(i => i.VendorName).HasMaxLength(200).IsRequired();
+            entity.Property(i => i.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(i => i.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(i => i.IssuedDate).HasColumnType("date");
+            entity.HasIndex(i => i.ProjectId);
+            entity.HasIndex(i => i.CategoryId);
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(i => i.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<BudgetCategory>()
+                .WithMany()
+                .HasForeignKey(i => i.CategoryId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
         });
 
         builder.Entity<ActivityLogEntry>(entity =>

@@ -60,11 +60,10 @@ dotnet run
 | POST   | `/api/auth/register`         | anonymous   | Create account → `{ token, expiresAt, user }` (409 if email taken) |
 | POST   | `/api/auth/login`            | anonymous   | Returns `{ token, expiresAt, user }`          |
 | GET    | `/api/auth/me`               | bearer JWT  | Current user (incl. onboarding state)         |
-| GET    | `/api/onboarding/options`    | anonymous   | Measurement / currency / timezone / temperature option lists |
+| GET    | `/api/reference/options`     | anonymous   | All seeded dropdown lists (measurement / currency / timezone / temperature / company / project type & status) |
 | PUT    | `/api/onboarding/preferences`| bearer JWT  | Save workspace preferences → updated user     |
 | PUT    | `/api/onboarding/company`    | bearer JWT  | Save company description → updated user        |
 | POST   | `/api/onboarding/complete`   | bearer JWT  | Mark onboarding done (+ start mode) → updated user |
-| GET    | `/api/projects/options`      | anonymous   | Project Type / Status option lists            |
 | GET    | `/api/projects`              | bearer JWT  | Current user's projects                       |
 | POST   | `/api/projects`              | bearer JWT  | Create a project                             |
 | GET    | `/health`                    | anonymous   | Liveness + DB check                           |

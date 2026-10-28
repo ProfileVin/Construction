@@ -2,13 +2,13 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Construction.Api.Auth;
 using Construction.Api.Common;
+using Construction.Api.Features.Auth;
 using Construction.Application;
 using Construction.Infrastructure;
 using Construction.Infrastructure.Persistence;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
@@ -113,7 +113,7 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        await DbSeeder.SeedAsync(app.Services);
+        ////await DbSeeder.SeedAsync(app.Services);
     }
 
     app.Run();

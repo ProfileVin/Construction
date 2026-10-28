@@ -47,13 +47,17 @@ cd backend  && dotnet build
 
 ## Backend
 
-- MVC Controllers (`[ApiController]`) organized in **feature folders** — each
-  area (`Auth/`, `Onboarding/`, `Reference/`, `Projects/`, `Dashboard/`)
-  contains its own `*Controller.cs`, `*Contracts.cs` (DTOs), and
-  `*Validator.cs` files together, not split into type-based folders. See
+- MVC Controllers (`[ApiController]`) organized in **feature folders** under
+  `Construction.Api/Features/` — each area (`Auth/`, `Onboarding/`,
+  `Reference/`, `Projects/`, `Dashboard/`) contains its own `*Controller.cs`,
+  `*Contracts.cs` (DTOs), and `*Validator.cs` files together, not split into
+  type-based folders (ADR-0013). Top-level `Construction.Api/Auth/` is
+  *not* a feature — it holds only global JWT/Identity plumbing
+  (`JwtOptions.cs`, `JwtTokenService.cs`) consumed by `Program.cs`. See
   `docs/ARCHITECTURE.md` for the current per-area layering pattern (Clean
-  Architecture pilot on Projects/Dashboard vs. the older flat pattern on
-  Auth/Onboarding/Reference — ADR-0010).
+  Architecture pilot on `Features/Projects`/`Features/Dashboard` vs. the
+  older flat pattern on `Features/Auth`/`Features/Onboarding`/
+  `Features/Reference` — ADR-0010).
 - Validate request DTOs with FluentValidation `IValidator<T>` from DI —
   resolved automatically by the global `Common/FluentValidationFilter.cs`
   action filter, so no per-action validation code is needed. Map DTOs with
