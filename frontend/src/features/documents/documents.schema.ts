@@ -8,7 +8,7 @@ export const ALLOWED_EXTENSIONS = [
   '.pdf',
   '.doc', '.docx', '.odt', '.rtf',
   '.xls', '.xlsx', '.csv', '.ods',
-  '.dwg', '.dxf', '.txt', '.zip',
+  '.dwg', '.dxf', '.ifc', '.txt', '.zip',
 ]
 
 export const extensionOf = (fileName: string) => {
@@ -23,7 +23,6 @@ export const uploadDocumentSchema = z.object({
     .refine((f) => f.size <= MAX_UPLOAD_BYTES, 'Files must be 100 MB or smaller')
     .refine((f) => ALLOWED_EXTENSIONS.includes(extensionOf(f.name)), "This file type isn't supported"),
   name: z.string().max(260, 'Keep the name under 260 characters').optional(),
-  phaseId: z.string().nullable().optional(),
 })
 
 export type UploadDocumentValues = z.infer<typeof uploadDocumentSchema>

@@ -55,7 +55,26 @@ export const editTaskSchema = z.object({
 
 export type EditTaskValues = z.infer<typeof editTaskSchema>
 
-export const logDescriptionSchema = z.object({
+// Mirrors DeadlineExtensionReasons.All on the API.
+export const deadlineExtensionReasons = [
+  'Weather Delay',
+  'Material Shortage',
+  'Labor Shortage',
+  'Design Change',
+  'Inspection Delay',
+  'Permit Delay',
+  'Other',
+] as const
+
+/** "After the current deadline" is checked against the task in the dialog (Calendar minDate) and by the API. */
+export const extendDeadlineSchema = z.object({
+  deadline: z.date({ message: 'Select a new deadline' }),
+  reason: z.enum(deadlineExtensionReasons, { message: 'Select a reason for the extension' }),
+})
+
+export type ExtendDeadlineValues = z.infer<typeof extendDeadlineSchema>
+
+export const logDescriptionSchema =z.object({
   description: z
     .string()
     .trim()

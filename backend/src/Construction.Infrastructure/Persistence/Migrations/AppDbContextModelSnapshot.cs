@@ -120,10 +120,20 @@ namespace Construction.Infrastructure.Persistence.Migrations
                     b.Property<decimal>("Amount")
                         .HasColumnType("decimal(18,2)");
 
+                    b.Property<Guid?>("CategoryId")
+                        .HasColumnType("uniqueidentifier");
+
                     b.Property<string>("CoNumber")
                         .IsRequired()
                         .HasMaxLength(40)
                         .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime?>("ContractorReviewedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("ContractorReviewedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateTime>("CreatedAt")
                         .HasColumnType("datetime2");
@@ -136,15 +146,30 @@ namespace Construction.Infrastructure.Persistence.Migrations
                         .HasMaxLength(500)
                         .HasColumnType("nvarchar(500)");
 
+                    b.Property<string>("OwnerDecidedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
                     b.Property<Guid>("ProjectId")
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("Reason")
-                        .HasMaxLength(2000)
-                        .HasColumnType("nvarchar(2000)");
+                        .HasMaxLength(60)
+                        .HasColumnType("nvarchar(60)");
+
+                    b.Property<string>("RequestedByName")
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
 
                     b.Property<DateOnly>("RequestedDate")
                         .HasColumnType("date");
+
+                    b.Property<int>("ScheduleImpactDays")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Scope")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
 
                     b.Property<int>("Sequence")
                         .HasColumnType("int");
@@ -159,10 +184,27 @@ namespace Construction.Infrastructure.Persistence.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("CategoryId");
+
                     b.HasIndex("ProjectId", "Sequence")
                         .IsUnique();
 
                     b.ToTable("ChangeOrders");
+                });
+
+            modelBuilder.Entity("Construction.Domain.Entities.ChangeOrderAttachment", b =>
+                {
+                    b.Property<Guid>("ChangeOrderId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ChangeOrderId", "DocumentId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.ToTable("ChangeOrderAttachments");
                 });
 
             modelBuilder.Entity("Construction.Domain.Entities.ConstructionPhase", b =>
@@ -265,6 +307,67 @@ namespace Construction.Infrastructure.Persistence.Migrations
                     b.HasIndex("ReceiptDocumentId");
 
                     b.ToTable("Invoices");
+                });
+
+            modelBuilder.Entity("Construction.Domain.Entities.Payment", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<decimal>("Amount")
+                        .HasColumnType("decimal(18,2)");
+
+                    b.Property<DateTime>("CreatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.Property<string>("Direction")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Method")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<string>("Notes")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
+                    b.Property<string>("PartyName")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("nvarchar(200)");
+
+                    b.Property<DateOnly>("PaymentDate")
+                        .HasColumnType("date");
+
+                    b.Property<string>("PaymentNumber")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<Guid>("ProjectId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<int>("Sequence")
+                        .HasColumnType("int");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(40)
+                        .HasColumnType("nvarchar(40)");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime2");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("ProjectId", "Sequence")
+                        .IsUnique();
+
+                    b.ToTable("Payments");
                 });
 
             modelBuilder.Entity("Construction.Domain.Entities.Project", b =>
@@ -1374,10 +1477,29 @@ namespace Construction.Infrastructure.Persistence.Migrations
 
             modelBuilder.Entity("Construction.Domain.Entities.ChangeOrder", b =>
                 {
+                    b.HasOne("Construction.Domain.Entities.BudgetCategory", null)
+                        .WithMany()
+                        .HasForeignKey("CategoryId");
+
                     b.HasOne("Construction.Domain.Entities.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
                         .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Construction.Domain.Entities.ChangeOrderAttachment", b =>
+                {
+                    b.HasOne("Construction.Domain.Entities.ChangeOrder", null)
+                        .WithMany()
+                        .HasForeignKey("ChangeOrderId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Construction.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
                 });
 
@@ -1406,6 +1528,15 @@ namespace Construction.Infrastructure.Persistence.Migrations
                         .WithMany()
                         .HasForeignKey("ReceiptDocumentId")
                         .OnDelete(DeleteBehavior.Restrict);
+                });
+
+            modelBuilder.Entity("Construction.Domain.Entities.Payment", b =>
+                {
+                    b.HasOne("Construction.Domain.Entities.Project", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Construction.Domain.Entities.Project", b =>

@@ -1,6 +1,15 @@
 import { api } from '../../lib/api'
+import type { DocumentFormat } from '../documents/documents.api'
 
-export type ChangeOrderStatus = 'Pending' | 'Approved' | 'Rejected'
+/** Pending = awaiting GC review; PendingOwnerApproval = reviewed, awaiting owner sign-off. */
+export type ChangeOrderStatus = 'Pending' | 'PendingOwnerApproval' | 'Approved' | 'Rejected'
+
+export interface ChangeOrderAttachment {
+  documentId: string
+  fileName: string
+  sizeBytes: number
+  format: DocumentFormat
+}
 
 export interface ChangeOrder {
   id: string
@@ -11,10 +20,24 @@ export interface ChangeOrder {
   status: ChangeOrderStatus
   /** YYYY-MM-DD */
   requestedDate: string
+  /** One of `changeOrderReasons`. */
   reason: string | null
-  /** When it was approved or rejected; null while Pending. */
+  /** Free-text summary & scope. */
+  scope: string | null
+  categoryId: string | null
+  categoryName: string | null
+  scheduleImpactDays: number
+  requestedByName: string | null
+  /** Step 1 — GC review (also set when rejected at this step). */
+  contractorReviewedAt: string | null
+  contractorReviewedByName: string | null
+  /** Step 2 — owner sign-off, with `decidedAt`. */
+  ownerDecidedByName: string | null
+  /** When it was finally approved or rejected; null while either step is pending. */
   decidedAt: string | null
   createdAt: string
+  /** Only filled by `getChangeOrder` (and create/decide responses); list rows leave it empty. */
+  attachments: ChangeOrderAttachment[]
 }
 
 export interface PagedChangeOrders {
@@ -25,7 +48,7 @@ export interface PagedChangeOrders {
 }
 
 export interface ChangeOrderSummary {
-  /** Pending + Approved; rejected change orders are excluded. */
+  /** Both pending steps + Approved; rejected change orders are excluded. */
   totalChangeOrders: number
   pendingApprovals: number
   approved: number
@@ -43,7 +66,11 @@ export interface CreateChangeOrderPayload {
   amount: number
   /** YYYY-MM-DD */
   requestedDate: string
-  reason?: string
+  reason: string
+  scope?: string
+  categoryId?: string | null
+  scheduleImpactDays: number
+  attachments: File[]
 }
 
 export type ChangeOrderDecision = 'approve' | 'reject'
@@ -60,8 +87,26 @@ export async function getChangeOrderSummary(projectId: string): Promise<ChangeOr
   return data
 }
 
+export async function getChangeOrder(projectId: string, changeOrderId: string): Promise<ChangeOrder> {
+  const { data } = await api.get<ChangeOrder>(`${base(projectId)}/${changeOrderId}`)
+  return data
+}
+
 export async function createChangeOrder(projectId: string, payload: CreateChangeOrderPayload): Promise<ChangeOrder> {
-  const { data } = await api.post<ChangeOrder>(base(projectId), payload)
+  const form = new FormData()
+  form.append('description', payload.description)
+  form.append('amount', String(payload.amount))
+  form.append('requestedDate', payload.requestedDate)
+  form.append('reason', payload.reason)
+  form.append('scheduleImpactDays', String(payload.scheduleImpactDays))
+  if (payload.scope) form.append('scope', payload.scope)
+  if (payload.categoryId) form.append('categoryId', payload.categoryId)
+  for (const file of payload.attachments) form.append('attachments', file)
+
+  // Same multipart override as createProjectTask.
+  const { data } = await api.post<ChangeOrder>(base(projectId), form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
 }
 

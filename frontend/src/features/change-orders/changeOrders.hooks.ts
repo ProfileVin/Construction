@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
   createChangeOrder,
   decideChangeOrder,
+  getChangeOrder,
   getChangeOrderSummary,
   searchChangeOrders,
   type ChangeOrderDecision,
@@ -15,6 +16,15 @@ export function useChangeOrders(projectId: string | undefined, filters: ChangeOr
     queryFn: () => searchChangeOrders(projectId as string, filters),
     enabled: Boolean(projectId),
     placeholderData: (prev) => prev,
+  })
+}
+
+/** One change order with its attachments, for Inspect. */
+export function useChangeOrder(projectId: string | undefined, changeOrderId: string | undefined) {
+  return useQuery({
+    queryKey: ['change-orders', 'detail', projectId, changeOrderId],
+    queryFn: () => getChangeOrder(projectId as string, changeOrderId as string),
+    enabled: Boolean(projectId && changeOrderId),
   })
 }
 
@@ -32,6 +42,10 @@ function useInvalidateChangeOrders(projectId: string | undefined) {
   return () => {
     qc.invalidateQueries({ queryKey: ['change-orders', 'list', projectId] })
     qc.invalidateQueries({ queryKey: ['change-orders', 'summary', projectId] })
+    qc.invalidateQueries({ queryKey: ['change-orders', 'detail', projectId] })
+    // Attachments are stored as project documents.
+    qc.invalidateQueries({ queryKey: ['documents', 'search', projectId] })
+    qc.invalidateQueries({ queryKey: ['documents', 'counts', projectId] })
     qc.invalidateQueries({ queryKey: ['invoices', 'summary', projectId] })
   }
 }

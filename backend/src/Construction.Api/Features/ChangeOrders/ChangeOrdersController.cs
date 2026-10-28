@@ -1,5 +1,7 @@
 using Construction.Api.Common;
 using Construction.Application.ChangeOrders;
+using Construction.Application.Dashboard;
+using Construction.Application.Documents;
 using Construction.Domain.Entities;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -11,6 +13,10 @@ namespace Construction.Api.Features.ChangeOrders;
 [Authorize]
 public class ChangeOrdersController(IChangeOrderService changeOrderService) : ControllerBase
 {
+    // Every attachment at its limit, plus a little for multipart framing.
+    private const long MaxRequestBytes =
+        (CreateChangeOrderRequestValidator.MaxAttachments * DocumentUploadRules.TaskAttachmentMaxSizeBytes) + (1024 * 1024);
+
     [HttpGet]
     public async Task<IResult> SearchAsync(
         Guid projectId,
@@ -51,9 +57,8 @@ public class ChangeOrdersController(IChangeOrderService changeOrderService) : Co
         return summary is null ? Results.NotFound() : Results.Ok(ChangeOrderSummaryResponse.From(summary));
     }
 
-    [HttpPost]
-    public async Task<IResult> CreateAsync(
-        Guid projectId, [FromBody] CreateChangeOrderRequest request, CancellationToken cancellationToken)
+    [HttpGet("{changeOrderId:guid}")]
+    public async Task<IResult> GetAsync(Guid projectId, Guid changeOrderId, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (userId is null)
@@ -61,15 +66,48 @@ public class ChangeOrdersController(IChangeOrderService changeOrderService) : Co
             return Results.Unauthorized();
         }
 
-        // Description and date are guaranteed by the validator.
-        var command = new CreateChangeOrderCommand(
-            request.Description!, request.Amount, request.RequestedDate!.Value, request.Reason);
-        var changeOrder = await changeOrderService.CreateAsync(userId, projectId, command, cancellationToken);
+        var changeOrder = await changeOrderService.GetAsync(userId, projectId, changeOrderId, cancellationToken);
+        return changeOrder is null ? Results.NotFound() : Results.Ok(ChangeOrderDto.From(changeOrder));
+    }
 
-        return changeOrder is null
-            ? Results.NotFound()
-            : Results.Created(
-                $"/api/projects/{projectId}/budget/change-orders/{changeOrder.Id}", ChangeOrderDto.From(changeOrder));
+    [HttpPost]
+    [RequestSizeLimit(MaxRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxRequestBytes)]
+    public async Task<IResult> CreateAsync(
+        Guid projectId, [FromForm] CreateChangeOrderRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // Count, size and extension are already checked by CreateChangeOrderRequestValidator.
+        var streams = request.Attachments.Select(f => f.OpenReadStream()).ToList();
+        try
+        {
+            var attachments = request.Attachments
+                .Select((f, i) => new TaskAttachment(f.FileName, f.ContentType, f.Length, streams[i]))
+                .ToList();
+
+            // Description, date and a known reason are guaranteed by the validator.
+            var command = new CreateChangeOrderCommand(
+                request.Description!, request.Amount, request.RequestedDate!.Value, request.Reason,
+                request.Scope, request.CategoryId, request.ScheduleImpactDays, attachments);
+            var changeOrder = await changeOrderService.CreateAsync(userId, projectId, command, cancellationToken);
+
+            return changeOrder is null
+                ? Results.NotFound()
+                : Results.Created(
+                    $"/api/projects/{projectId}/budget/change-orders/{changeOrder.Id}", ChangeOrderDto.From(changeOrder));
+        }
+        finally
+        {
+            foreach (var stream in streams)
+            {
+                await stream.DisposeAsync();
+            }
+        }
     }
 
     [HttpPost("{changeOrderId:guid}/approve")]
@@ -94,7 +132,7 @@ public class ChangeOrdersController(IChangeOrderService changeOrderService) : Co
         {
             ChangeOrderDecisionStatus.Decided => Results.Ok(ChangeOrderDto.From(result.ChangeOrder!)),
             ChangeOrderDecisionStatus.NotPending => Results.Json(
-                new { message = "Only pending change orders can be approved or rejected." },
+                new { message = "Only change orders awaiting review or sign-off can be approved or rejected." },
                 statusCode: StatusCodes.Status409Conflict),
             _ => Results.NotFound(),
         };

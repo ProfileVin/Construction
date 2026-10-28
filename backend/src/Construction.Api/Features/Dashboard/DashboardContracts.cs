@@ -83,3 +83,6 @@ public class CreateActivityLogRequest
 }
 
 public record UpdateActivityLogRequest(string? Description);
+
+/// <summary>Schedule → View Details "Extend Deadline". Nullable so the validator owns the messages.</summary>
+public record ExtendTaskDeadlineRequest(DateOnly? Deadline, string? Reason);

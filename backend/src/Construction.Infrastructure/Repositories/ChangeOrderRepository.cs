@@ -18,7 +18,8 @@ public class ChangeOrderRepository(AppDbContext db) : IChangeOrderRepository
             q = q.Where(c =>
                 EF.Functions.Like(c.CoNumber, term) ||
                 EF.Functions.Like(c.Description, term) ||
-                (c.Reason != null && EF.Functions.Like(c.Reason, term)));
+                (c.Reason != null && EF.Functions.Like(c.Reason, term)) ||
+                (c.Scope != null && EF.Functions.Like(c.Scope, term)));
         }
 
         if (query.Status is { } status)
@@ -64,12 +65,29 @@ public class ChangeOrderRepository(AppDbContext db) : IChangeOrderRepository
 
         decimal SumFor(ChangeOrderStatus status) => sums.FirstOrDefault(s => s.Status == status)?.Total ?? 0;
         return new ChangeOrderTotals(
-            SumFor(ChangeOrderStatus.Pending), SumFor(ChangeOrderStatus.Approved), SumFor(ChangeOrderStatus.Rejected));
+            SumFor(ChangeOrderStatus.Pending) + SumFor(ChangeOrderStatus.PendingOwnerApproval),
+            SumFor(ChangeOrderStatus.Approved), SumFor(ChangeOrderStatus.Rejected));
     }
 
     public Task AddAsync(ChangeOrder changeOrder, CancellationToken cancellationToken)
     {
         db.ChangeOrders.Add(changeOrder);
         return Task.CompletedTask;
+    }
+
+    public Task AddAttachmentAsync(ChangeOrderAttachment attachment, CancellationToken cancellationToken)
+    {
+        db.ChangeOrderAttachments.Add(attachment);
+        return Task.CompletedTask;
+    }
+
+    public async Task<IReadOnlyList<ProjectDocument>> ListAttachmentsAsync(
+        Guid changeOrderId, CancellationToken cancellationToken)
+    {
+        return await db.ChangeOrderAttachments
+            .Where(a => a.ChangeOrderId == changeOrderId)
+            .Join(db.ProjectDocuments, a => a.DocumentId, d => d.Id, (_, d) => d)
+            .OrderBy(d => d.CreatedAt).ThenBy(d => d.OriginalFileName)
+            .ToListAsync(cancellationToken);
     }
 }

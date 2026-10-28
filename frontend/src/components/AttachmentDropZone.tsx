@@ -16,6 +16,8 @@ interface AttachmentDropZoneProps {
   error?: string
   /** Smaller label and tighter gap for `.form-dialog--compact`. */
   compact?: boolean
+  /** Lets Browse / drop pick several files; `onChange` is called once per file (the caller keeps the list). */
+  multiple?: boolean
 }
 
 /** Dashed single-file picker (drag & drop or Browse) used by the task and log dialogs. */
@@ -27,11 +29,14 @@ export function AttachmentDropZone({
   onChange,
   error,
   compact = false,
+  multiple = false,
 }: AttachmentDropZoneProps) {
   const [dragging, setDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  const pick = (picked: File | undefined) => picked && onChange(picked)
+  const pick = (files: FileList | null | undefined) => {
+    for (const picked of Array.from(files ?? []).slice(0, multiple ? undefined : 1)) onChange(picked)
+  }
   const browse = () => fileInputRef.current?.click()
 
   return (
@@ -46,7 +51,7 @@ export function AttachmentDropZone({
         onDrop={(e) => {
           e.preventDefault()
           setDragging(false)
-          pick(e.dataTransfer.files[0])
+          pick(e.dataTransfer.files)
         }}
       >
         {file ? (
@@ -89,9 +94,10 @@ export function AttachmentDropZone({
         ref={fileInputRef}
         type="file"
         accept={ACCEPT}
+        multiple={multiple}
         className="hidden"
         onChange={(e) => {
-          pick(e.target.files?.[0])
+          pick(e.target.files)
           e.target.value = ''
         }}
       />

@@ -17,6 +17,220 @@ Entry template:
 
 ---
 
+## 2026-10-28 — Change Order Inspect: Summary & Scope + Attachments always shown (BUG-015)
+**Refs:** BUG-015, FEAT-031, ADR-0029
+**What:**
+- **Frontend:** `ChangeOrderDetailsDialog` always renders the Summary & Scope card (as in the mockup). It shows
+  "No scope provided." / "No attachments." when those are empty, instead of hiding the whole card.
+- **Backend (seeder only):**
+  - Every change-order seed now has a scope.
+  - A new startup top-up fills a null `Scope` / `RequestedByName` on the demo COs (matched by description).
+  - The top-up also attaches an embedded `Site-Survey.png` and `Contractor-Quote.pdf` through `AttachmentUploader`
+    to any demo CO with no files.
+  - No migration and no API change.
+**Why:** The user reported that Inspect showed no scope or attachments. The API path worked; the data was empty
+(8/12 seeds had no scope, no seed had files, and pre-FEAT-031 rows had no requester), and the dialog hid the card.
+**Files:** `frontend/src/features/change-orders/ChangeOrderDetailsDialog.tsx`, `backend/src/Construction.Api/Common/DbSeeder.cs`.
+**Verification:**
+- `npm run build` and `npm run lint` are clean. The API built to a scratch folder with 0 warnings and 0 errors
+  (:5080 locks the Debug DLLs).
+- Ran the new build on :5081 (cwd `src/Construction.Api`, so files land in the real `App_Data/uploads`):
+  - Every demo CO in the 3 projects now has a scope, "Site Admin" as requester, and 2 attachments.
+  - The user's COs ("Reject me", CO-0013) are unchanged.
+  - After a restart, Riverside still has 24 attachments (no duplicates).
+  - Both files download as `application/pdf` / `image/png`.
+- `playwright-cli` on :5173:
+  - Inspect on Riverside CO-0006 shows the scope text and both file chips; clicking one opens a new tab.
+  - A user CO shows the two empty-state lines.
+**Follow-ups:**
+- Restart the :5080 API so it runs the new seeder code. The data is already in the DB.
+- The mockup's role under Requested By ("Project Manager") and the owner's name/company on Owner Sign-Off still
+  have no data.
+
+## 2026-10-28 — Team: "Invite New Team Member" modal redesign (FEAT-033)
+**Refs:** FEAT-033 (updates FEAT-015)
+**What:**
+- `TeamMemberFormDialog` was rebuilt to the mockup (`form-dialog` look, 40rem).
+  - **Invite mode:**
+    - A read-only "Who Has Access" list: the logged-in user as Owner, then active members from the same
+      `useTeamMembers({ status: 'Active', pageSize: 100 })` query `AssigneeDropdown` uses. Each row has a PrimeReact
+      initials `Avatar` and the role title; the list scrolls inside `max-h-40`.
+    - Then Full Name / Email Address / Role (the editable trade-role dropdown, "Assign a role").
+    - A disabled, checked "Link Should Expire After Use" `InputSwitch` with a "not available yet" note, marked
+      `shortcut:` in the code.
+    - Buttons: Cancel / "Send Invitation & Add Member".
+  - **Edit mode:** the same three fields plus Specialty and Assigned Phase, and "Save Changes".
+- `initials()` moved from `components/Topbar.tsx` to `lib/format.ts`.
+**Why:** The user's mockup for Team → Invite Team Member. The user chose: add-only (no email or invite links), a
+read-only access list, and Role = the existing trade role.
+**Files:** `frontend/src/features/team/TeamMemberFormDialog.tsx`, `frontend/src/components/Topbar.tsx`,
+`frontend/src/lib/format.ts`, `docs/*`.
+**Verification:**
+- `npm run build` + `npm run lint` pass. No backend change.
+- Standalone `playwright-core` on the user's Vite :5173, demo user, `/team` at 1440 px:
+  - The access list shows "SA Site Admin Owner" plus 10 active members, and the switch is checked and disabled.
+  - An empty submit → name/email/role errors.
+  - A valid invite → the dialog closes, and the member is in the table (Active, no phase).
+  - The same email again → "A member with this email is already on the project."
+  - Edit shows Specialty/Phase and no access list, and a saved specialty shows in the row.
+  - At 375 px there's no page overflow (the dialog scrolls, like the other form dialogs).
+- Probe: typing in the editable Role field opens its suggestion list. A mouse click or Tab closes it.
+  Escape closes the whole dialog (PrimeReact default, unchanged).
+**Follow-ups:** Real invitations (link/email, expiry) and per-member access levels are out of scope. One test
+member "Invite Test …" was added to the "API test - change orders (safe to delete)" project.
+
+## 2026-10-28 — Documents: "Upload New Document" modal redesign (FEAT-032)
+**Refs:** FEAT-032 (updates FEAT-014)
+**What:**
+- `UploadDocumentDialog` was rebuilt to the mockup (`form-dialog` look).
+  - Fields: "Document Title / Display Name" first (optional), then "Source File Attachment" with "Max: 100 MB".
+  - The drop zone is a large dashed, light-grey box with a cloud icon in a white circle, "Drag and drop files
+    here, or browse files" and the supported-types hint.
+  - Footer: equal Cancel / Upload buttons.
+  - Kept: the drag/drop and file-input logic, the zod checks, the progress bar and the error mapping.
+- The Phase dropdown and its `phaseId` schema field were removed (the mockup has neither). The API still accepts
+  `phaseId`, so existing files keep theirs.
+- `.ifc` was added to `DocumentUploadRules.AllowedExtensions` and the client `ALLOWED_EXTENSIONS`, so the hint's
+  "IFC" is true. `AttachmentDropZone` shares that list, so task/log/change-order attachments accept it too.
+**Why:** The user's mockup for Document → Upload Document. The user didn't answer the phase/title/IFC questions,
+so the recommended defaults were used: drop Phase, keep the title optional, allow IFC.
+**Files:** `frontend/src/features/documents/{UploadDocumentDialog.tsx,documents.schema.ts}`,
+`backend/src/Construction.Application/Documents/DocumentUploadRules.cs`, `docs/*`.
+**Verification:**
+- `npm run build` + `npm run lint` pass; `dotnet build` passes (0 warnings, 0 errors). The API was restarted.
+- Standalone `playwright-core` on the user's Vite :5173, demo user, `/documents` at 1440 px:
+  - The dialog text matches the mockup, and the dialog is 506px tall.
+  - An empty submit shows "Choose a file to upload". A `.exe` shows "This file type isn't supported".
+  - A titled `.ifc` uploads and shows as "BIM Model …" with a File badge.
+  - A `.png` with a blank title uses the file name and an Image badge.
+  - At 375 px nothing overflows, the buttons stack, and the dialog fits without scrolling.
+**Follow-ups:** Multi-file upload ("files" in the mockup copy) isn't supported: the endpoint and table take one file
+per upload. A test `.ifc` and a 1×1 `.png` were uploaded to the "API test - change orders (safe to delete)" project.
+
+## 2026-10-28 — Budget: Payments tab + "Record Payment" modal (FEAT-028)
+**Refs:** FEAT-028, ADR-0028 (follows the FEAT-025 / ADR-0024 purchase-order pattern)
+**What:**
+- **Domain/DB:** new `Payment` entity (`PaymentDirection` Inbound/Outbound, `PaymentMethod` Ach/Wire/PayPal/Check,
+  `PaymentStatus` Processing/Cleared, `PAY-{seq:0000}`), migration `AddPayments`.
+- **Application/Infrastructure:** `Payments/*` (DTOs, command + list query, `IPaymentRepository`, `PaymentService`)
+  and `PaymentRepository`: search on number/payee, Cleared totals grouped by direction, payee-name `UNION` of
+  payments + PO vendors + invoice vendors.
+- **API:** `PaymentsController` at `api/projects/{id}/budget/payments` — list, `summary`, `payees`, create (JSON,
+  `CreatePaymentRequestValidator`), `{id}/mark-cleared`, delete (409 unless Processing). `DbSeeder` tops up 12 demo
+  payments (the mockup rows plus earlier client payments, so Received = the mockup's $120,003.90).
+- **Frontend:** new `features/payments/` (`PaymentsPanel`, `PaymentsTable`, `RecordPaymentDialog`,
+  `PaymentDetailsDialog`, `PaymentStatusBadge`, api/hooks/schema), wired into `BudgetPage`. The tab label is now
+  "Payment". The payee field is an editable `Dropdown`, as in the Team role field.
+**Why:** The user's two mockups for Budget & Finance → Payment; FEAT-028 was the placeholder.
+**Files:** `backend/src/Construction.Domain/Entities/Payment.cs`, `backend/src/Construction.Application/{Payments/*,DependencyInjection.cs}`,
+`backend/src/Construction.Infrastructure/{Persistence/AppDbContext.cs,Persistence/Migrations/*_AddPayments.cs,Repositories/PaymentRepository.cs,DependencyInjection.cs}`,
+`backend/src/Construction.Api/{Features/Payments/*,Common/DbSeeder.cs}`, `frontend/src/features/payments/*`,
+`frontend/src/features/budget/budget.tabs.ts`, `frontend/src/pages/BudgetPage.tsx`, `README.md`, `docs/*`.
+**Verification:**
+- `dotnet build` passes (0 warnings, 0 errors); `npm run build` + `npm run lint` pass.
+- API with curl, as the demo user:
+  - The seeded summary is Received $120,003.90.
+  - Search + status filter work, and the payee list includes PO/invoice vendors.
+  - Validator messages appear for an empty or invalid body.
+  - Create → Processing, and the KPI is unchanged. Mark-cleared → the KPI goes up.
+  - Deleting a Cleared payment → 409. An unknown project → 404. No token → 401.
+- Standalone `playwright-core` script (the MCP bridge wasn't connected) on the user's Vite :5173 at 1440 px:
+  - KPIs and table render, and the active tab is "Payment".
+  - Search "sebastian" → 3 rows. Processing filter and page 2 work.
+  - An empty submit shows the payee/amount errors.
+  - The payee dropdown offers PO vendors, and picking one fills the field.
+  - A typed new payee records an outbound Bank Check payment: Processing, KPI unchanged. The details dialog
+    shows every field. Mark as Cleared moves Payment Disbursed by the amount and removes the ⋮ menu.
+  - A Processing payment is deleted after the confirm.
+  - At 375 px there is no horizontal page overflow on the page or in the dialog.
+- A first version reset the form in the dialog's `onShow`. When the form was filled the instant the dialog opened,
+  that reset could wipe the input. It was removed (`close()` already resets), and the check passes with an
+  immediate fill.
+**Follow-ups:** No edit-payment action. Payee suggestions aren't split by direction. No link from payments to
+invoices/POs (ADR-0028). The UI test left a few Cleared test payments in the "API test - change orders (safe to
+delete)" project.
+
+## 2026-10-28 — Change Orders: create + Inspect redesign, 2-step approval (FEAT-031)
+**Refs:** FEAT-031, ADR-0027 (builds on FEAT-026, ADR-0025)
+**What:**
+- **Domain/DB:** `ChangeOrder` gains Scope (renamed from the old Reason), Reason (dropdown value), CategoryId,
+  ScheduleImpactDays, RequestedByName, ContractorReviewedAt/ByName and OwnerDecidedByName.
+  `ChangeOrderStatus.PendingOwnerApproval` is new. `Approve(byName)`/`Reject(byName)` work step by step. A new
+  `ChangeOrderAttachment` link entity was added. Migration `ChangeOrderDetailsAndTwoStepApproval` was hand-tuned to
+  rename Reason → Scope and backfill step 1 on decided rows.
+- **Application:**
+  - `ChangeOrderReasons`.
+  - The create command carries scope/category/impact/files.
+  - `ChangeOrderService` gained `GetAsync` (category name + attachments). `CreateAsync` stores files and records
+    the requester. `DecideAsync` records the signer.
+  - The totals' Pending covers both steps.
+  - `AttachmentUploader.SaveWithAsync` gained a list overload.
+- **API:** create is multipart (≤5 files, size/extension rules, reason list, 0–365 days). Added `GET {id}`. The
+  seeder data now has reasons, scopes and impact days, and one CO left at owner sign-off (only fresh DBs get it).
+- **Frontend:**
+  - `NewChangeOrderDialog` and `ChangeOrderDetailsDialog` were rebuilt to the mockups.
+  - `useChangeOrder` detail query.
+  - The status badge and filter gained "Pending GC Review" / "Pending Owner Approval".
+  - `AttachmentDropZone` got a `multiple` prop.
+**Why:** The user's mockups for Budget & Finance → Change Order → New Change Order / Inspect.
+**Files:** `backend/src/Construction.Domain/Entities/ChangeOrder.cs`,
+`backend/src/Construction.Application/{ChangeOrders/*,Documents/AttachmentUploader.cs}`,
+`backend/src/Construction.Infrastructure/{Persistence/AppDbContext.cs,Persistence/Migrations/*_ChangeOrderDetailsAndTwoStepApproval.cs,Repositories/ChangeOrderRepository.cs}`,
+`backend/src/Construction.Api/{Features/ChangeOrders/*,Common/DbSeeder.cs}`,
+`frontend/src/features/change-orders/*`, `frontend/src/components/AttachmentDropZone.tsx`.
+**Verification:**
+- `npm run build` and `npm run lint` are clean.
+- The API compiles with 0 warnings when built to a scratch output folder. The running :5080 API locks the Debug DLLs.
+- Ran the new build on :5081, which applied the migration, and curl-tested a scratch project
+  "API test - change orders (safe to delete)":
+  - Create with 2 files → 201, and `GET {id}` lists both attachments.
+  - Approve → PendingOwnerApproval; the KPI stays under Pending.
+  - Approve → Approved; the KPI moves to Approved.
+  - A 3rd approve → 409.
+  - Reject at the GC step → Rejected, with only the GC signer set.
+  - A bad reason, a `.exe` file, 6 files, or 400 days each → 400.
+- Riverside Villas' existing change orders read back correctly: old reasons appear as scope, decided rows have
+  step 1 backfilled, and the KPIs are unchanged.
+- The UI wasn't clicked through because :5080 still runs the old build.
+**Follow-ups:** Restart the API. Delete the scratch test project when convenient (there is no project-delete
+endpoint yet). Add role/owner data if the timeline should show titles or the client's name.
+
+## 2026-10-28 — Schedule "View Details": deadline details & extension (FEAT-030)
+**Refs:** FEAT-030, ADR-0026 (builds on FEAT-020, FEAT-022)
+**What:**
+- **Backend:** `IActivityLogRepository.ListByTaskAsync`; `DashboardService.ListTaskActivityLogAsync` and
+  `ExtendTaskDeadlineAsync` (new `TaskUpdateStatus.DeadlineNotLater`, `DeadlineExtensionReasons`);
+  `DashboardController` `GET tasks/{taskId}/activity-log` and `POST tasks/{taskId}/extend-deadline`
+  (`ExtendTaskDeadlineRequest` + validator). No migration.
+- **Frontend:** `TaskDetailsDialog` rebuilt to the mockup (due-date card + days-remaining pill, assignee + trade,
+  task logs, Extend Deadline form with Calendar + reason Dropdown, Cancel / Confirm Extension). Kept "Edit task"
+  (opens `EditTaskDialog`) and "Open attachment". New `extendTaskDeadline` / `listTaskActivityLog` API calls,
+  `useExtendTaskDeadline` / `useTaskActivityLog` hooks, `extendDeadlineSchema` + `deadlineExtensionReasons`.
+**Why:** The user's mockup for Schedule tab → View Details.
+**Files:** `backend/src/Construction.Application/Dashboard/{DashboardService,IDashboardService,IActivityLogRepository,UpdateProjectTaskCommand}.cs`,
+`backend/src/Construction.Infrastructure/Repositories/ActivityLogRepository.cs`,
+`backend/src/Construction.Api/Features/Dashboard/{DashboardController,DashboardContracts,ExtendTaskDeadlineRequestValidator}.cs`,
+`frontend/src/features/dashboard/{TaskDetailsDialog.tsx,dashboard.api.ts,dashboard.hooks.ts,dashboard.schema.ts}`.
+**Verification:** `npm run build` and `npm run lint` pass. The API compiles with 0 errors and 0 warnings when built to a
+separate output folder. The normal `dotnet build` hit MSB3021 because the running API (PID 48416) locked the Debug DLLs.
+Ran the new build on :5081 and curl-tested it: the per-task log returns only that task's entries; a same-date
+extension → 400 `deadline`; an unknown reason → 400; an unknown task → 404. The success path and the UI weren't
+exercised because :5080 still runs the old build and dev data was left unchanged.
+**Follow-ups:** Restart the API, then click through Schedule → View Details → Confirm Extension.
+
+## 2026-10-27 — Add Techstack.md; fix stale stack tables
+**Refs:** ADR-0011, ADR-0012 (docs only)
+**What:** Added a root `Techstack.md` that lists every frontend and backend technology with its version and purpose,
+plus database/storage, auth, tooling, testing status, and a "not yet adopted" list. Corrected the Stack tables in
+`README.md` and `docs/PROJECT.md`: "minimal APIs" is now "MVC Controllers", and Mapster is removed because no project
+references it. Linked `Techstack.md` from the README docs table.
+**Why:** The user asked for one file that lists the whole stack. The existing summaries had drifted from the code.
+**Files:** `Techstack.md`, `README.md`, `docs/PROJECT.md`.
+**Verification:** Checked every version against `frontend/package.json` and the four `backend/src/*/*.csproj`.
+Grep confirms that `Mapster` and `minimal APIs` no longer appear in either Stack table. No code changed, so the
+build and lint gates were not run.
+**Follow-ups:** Keep `Techstack.md` in sync whenever a dependency is added or bumped.
+
 ## 2026-10-22 — Pin patched System.Security.Cryptography.Pkcs (BUG-014)
 **Refs:** BUG-014
 **What:** Added a direct `System.Security.Cryptography.Pkcs` 10.0.13 reference to `Construction.Infrastructure.csproj`,

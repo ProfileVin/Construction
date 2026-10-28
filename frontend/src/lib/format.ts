@@ -23,3 +23,13 @@ export function formatFileSize(bytes: number): string {
   const digits = unit === 0 || value >= 100 ? 0 : 1
   return `${value.toFixed(digits)}${units[unit]}`
 }
+
+/** "Site Admin" → "SA"; used for initials avatars. */
+export function initials(fullName: string | undefined): string {
+  if (!fullName) return '?'
+  const parts = fullName.trim().split(/\s+/)
+  return parts
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase())
+    .join('')
+}

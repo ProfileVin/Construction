@@ -34,27 +34,36 @@ public class AttachmentUploader(
     /// Writes the file, queues its document row plus whatever <paramref name="addRows"/> adds, and saves —
     /// deleting the file again if the save fails.
     /// </summary>
-    public async Task SaveWithAsync(
-        ProjectDocument? document, TaskAttachment? file, Func<Task> addRows, CancellationToken cancellationToken)
-    {
-        if (document is not null)
-        {
-            await fileStorage.SaveAsync(document.StorageKey, file!.Content, cancellationToken);
-        }
+    public Task SaveWithAsync(
+        ProjectDocument? document, TaskAttachment? file, Func<Task> addRows, CancellationToken cancellationToken) =>
+        SaveWithAsync(document is null ? [] : [(document, file!)], addRows, cancellationToken);
 
+    /// <summary>Several files at once (change order attachments); every written file is deleted if the save fails.</summary>
+    public async Task SaveWithAsync(
+        IReadOnlyList<(ProjectDocument Document, TaskAttachment File)> uploads,
+        Func<Task> addRows,
+        CancellationToken cancellationToken)
+    {
+        var written = new List<string>();
         try
         {
-            if (document is not null)
+            foreach (var (document, file) in uploads)
             {
+                await fileStorage.SaveAsync(document.StorageKey, file.Content, cancellationToken);
+                written.Add(document.StorageKey);
                 await documents.AddAsync(document, cancellationToken);
             }
 
             await addRows();
             await unitOfWork.SaveChangesAsync(cancellationToken);
         }
-        catch when (document is not null)
+        catch when (written.Count > 0)
         {
-            await fileStorage.DeleteAsync(document.StorageKey, CancellationToken.None);
+            foreach (var key in written)
+            {
+                await fileStorage.DeleteAsync(key, CancellationToken.None);
+            }
+
             throw;
         }
     }

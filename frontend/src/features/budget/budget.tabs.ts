@@ -3,7 +3,7 @@ export const BUDGET_TABS = [
   { value: 'purchase-orders', label: 'Purchase Order', icon: 'pi pi-shopping-cart' },
   { value: 'change-orders', label: 'Change Order', icon: 'pi pi-sync' },
   { value: 'invoices', label: 'Invoice', icon: 'pi pi-file' },
-  { value: 'payments', label: 'Payments', icon: 'pi pi-credit-card' },
+  { value: 'payments', label: 'Payment', icon: 'pi pi-credit-card' },
   { value: 'reports', label: 'Reports', icon: 'pi pi-chart-bar' },
 ] as const
 

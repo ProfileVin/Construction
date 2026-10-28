@@ -719,3 +719,83 @@ modal, and approvals that reach contract value only.
 **Consequences:** `BudgetService` now depends on `IChangeOrderRepository`. If approvals should later raise
 the budget or shift phases, that's a new decision (it would move many existing KPIs). Approved/rejected COs
 can't be reverted. Like POs, there's no retry on a concurrent-create sequence collision.
+
+## ADR-0026 — Deadline extensions are logged as activity-log entries; fixed reason list
+**Status:** Accepted (2026-10-28)
+**Context:** The Schedule "View Details" mockup (FEAT-030) has an "Extend Deadline" form with a new date and a
+"Reason For Extension" dropdown, plus a per-task "Task Logs & Updates" list. Tasks had no reason field and the only
+log endpoint returned the project's latest 20 entries.
+**Decision:**
+- **A dedicated `POST …/tasks/{taskId}/extend-deadline`** (deadline + reason) instead of reusing the full-task PUT.
+  The new date must be later than the current deadline (400 on `deadline` otherwise). One save updates the task and
+  adds an activity-log entry "Deadline extended from <old> to <new> — <reason>".
+- **The reason lives only in that log entry** — no new column or migration. It then shows in the task's log list,
+  the Dashboard Recent Log and Task Log without extra work.
+- **Reasons are a fixed list** (`DeadlineExtensionReasons.All`, mirrored in `dashboard.schema.ts`), the same pattern
+  as `ActivityLogCategories`.
+- **`GET …/tasks/{taskId}/activity-log`** returns every entry on one task, newest first, reusing `ToDtosAsync`.
+- **Trade** in the Assignee card is the active team member's `roleTitle` matched on `fullName`, from the same cached
+  team query as `AssigneeDropdown`; hidden when the assignee isn't an active member.
+**Consequences:** Extension history is text, so it can't be queried as structured data (e.g. "count weather
+delays"). If that's needed, add a `TaskDeadlineExtension` table. The per-task log list isn't paged.
+
+## ADR-0027 — Change orders: two-step approval, Reason → Scope, multi-attachment link table
+**Status:** Accepted (2026-10-28)
+**Context:** The Change Order create/Inspect mockups (FEAT-031) add a Reason dropdown, Category / Trade,
+Schedule Impact, several attachments, and a two-step "General Contractor Review → Owner Sign-Off" timeline.
+ADR-0025 had a single Pending → Approved/Rejected decision and a free-text Reason. The user chose a real two-step
+workflow, multiple files, an optional Summary & Scope field, and "no hardcoded UI text".
+**Decision:**
+- **Statuses:** `Pending` (awaiting GC review) → `PendingOwnerApproval` → `Approved`. Reject is allowed at
+  either step and records the signer on that step. Approve/Reject routes are unchanged: approve advances one step.
+  Anything not awaiting a step returns 409. The enum is stored as a string, so the new value needs no data change.
+- **KPIs:** Pending Approvals = both pending steps; Approved (and so the Invoice tab's contract value) moves
+  only on owner sign-off.
+- **Signers are the logged-in user's display name** (`IUserDirectory`). There are no per-role accounts yet, so one
+  user can sign both steps. The UI shows only stored names and dates, and hides them when absent.
+- **`Reason` → `Scope` rename** keeps the old free text. `Reason` is now a short value from `ChangeOrderReasons.All`,
+  mirrored on the client like `ActivityLogCategories`. The migration backfills `ContractorReviewedAt = DecidedAt` for
+  rows decided under the single-step flow.
+- **Attachments** use a `ChangeOrderAttachments (ChangeOrderId, DocumentId)` link table: cascade from the change
+  order, Restrict to the document (multiple-cascade-path rule, as for invoice receipts). Up to 5 files of 25 MB.
+  `AttachmentUploader.SaveWithAsync` gained a list overload that deletes every written file if the save fails.
+- **Category / Trade** is the project's budget category (nullable FK, ClientSetNull, as for invoices). A category
+  from another project is dropped.
+- Create is now multipart. The request date is the submission day, since the mockup has no date field.
+**Consequences:** The old :5080 build can't read `PendingOwnerApproval` rows, so restart the API after pulling.
+Documents attached to a change order can't be hard-deleted while linked (there's no delete endpoint today). Role
+titles ("Project Manager") and an owner/client name aren't shown, because no data backs them yet.
+
+
+## ADR-0028 — Payments: standalone ledger, Cleared-only KPIs, payee suggestions
+**Status:** Accepted (2026-10-28)
+**Context:** The Payments tab mockup (FEAT-028) records inbound client payments and outbound vendor
+disbursements, with Processing/Cleared statuses and two KPI cards. The modal has no invoice or PO field. The
+user chose: payments are standalone, the KPIs count Cleared payments only, and Client/Payee is a type-or-pick
+dropdown.
+**Decision:**
+- **New `Payment` entity**, copying the purchase-order pattern (ADR-0024): per-project `Sequence` (max + 1,
+  unique), `PAY-{seq:0000}`, enums stored as strings. The mockup mixes INV- refs into REF#, but those aren't
+  linked to anything, so every row gets a PAY number.
+- **Standalone:** recording or clearing a payment doesn't mark invoices/POs paid or change `Project.TotalSpent`.
+  Only the payment queries are invalidated.
+- **Statuses:** new payments are `Processing`; `Mark as Cleared` is one way. Only Processing payments can be
+  deleted (409 otherwise), as with Pending POs.
+- **KPIs** sum `Cleared` amounts by direction: money in transit isn't "received" yet.
+- **Payee suggestions** come from `GET …/payments/payees`: a SQL `UNION` of this project's payment party names,
+  PO vendors and invoice vendors (distinct, sorted, max 100). It's one list for both directions; any name can be
+  typed in.
+**Consequences:** A client payment can be suggested a vendor's name (and vice versa); good enough until there's a
+real client/vendor directory. Cleared payments can't be edited or removed through the API.
+
+## ADR-0029 — Demo-data top-ups may write through `AppDbContext` directly
+**Status:** Accepted (2026-10-28)
+**Context:** FEAT-031 added Scope, RequestedByName and attachments to change orders. Dev databases seeded earlier
+have demo COs without them, so the Inspect dialog looked empty (BUG-015). The seeder only creates COs for projects
+that have none, and there is no edit endpoint for these fields.
+**Decision:** `DbSeeder.SeedChangeOrdersAsync` runs a startup top-up. It does `ExecuteUpdate` on the owner's COs
+whose description matches a seed: it fills a null Scope / RequestedByName and attaches two embedded sample files
+(through the existing `AttachmentUploader`) to COs with no attachments. It writes through `AppDbContext` rather
+than a new service method, because this is dev-only demo data and shouldn't grow the application API.
+**Consequences:** The top-up is idempotent (null checks / "no attachments" filter). User-created COs are never
+matched unless they share a seed description exactly. Each demo CO adds 2 small documents to the Documents tab.

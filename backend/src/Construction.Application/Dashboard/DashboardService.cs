@@ -110,6 +110,47 @@ public class DashboardService(
             ProjectTaskDto.From(task, phaseId is { } id ? phaseNames[id] : null));
     }
 
+    public async Task<TaskUpdateResult> ExtendTaskDeadlineAsync(
+        string ownerId, Guid projectId, Guid taskId, DateOnly newDeadline, string reason, CancellationToken cancellationToken)
+    {
+        if (!await projects.ExistsForOwnerAsync(projectId, ownerId, cancellationToken))
+        {
+            return new TaskUpdateResult(TaskUpdateStatus.NotFound);
+        }
+
+        var task = await tasks.GetAsync(projectId, taskId, cancellationToken);
+        if (task is null)
+        {
+            return new TaskUpdateResult(TaskUpdateStatus.NotFound);
+        }
+
+        if (newDeadline <= task.Deadline)
+        {
+            return new TaskUpdateResult(TaskUpdateStatus.DeadlineNotLater);
+        }
+
+        var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
+        var previousDeadline = task.Deadline;
+        task.Update(task.Title, task.AssigneeName, newDeadline, task.PhaseId, task.Status, nowUtc);
+
+        var culture = System.Globalization.CultureInfo.InvariantCulture;
+        await AddLogEntryAsync(
+            projectId,
+            $"Deadline extended from {previousDeadline.ToString("MMM d, yyyy", culture)} to {newDeadline.ToString("MMM d, yyyy", culture)} — {reason}",
+            task.Id, nowUtc, cancellationToken);
+
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+
+        string? phaseName = null;
+        if (task.PhaseId is { } taskPhaseId)
+        {
+            var phase = (await phases.ListByProjectAsync(projectId, cancellationToken)).FirstOrDefault(p => p.Id == taskPhaseId);
+            phaseName = phase?.Name;
+        }
+
+        return new TaskUpdateResult(TaskUpdateStatus.Updated, ProjectTaskDto.From(task, phaseName));
+    }
+
     public async Task<IReadOnlyList<ActivityLogEntryDto>?> ListActivityLogAsync(
         string ownerId, Guid projectId, CancellationToken cancellationToken)
     {
@@ -119,6 +160,19 @@ public class DashboardService(
         }
 
         var entries = await activityLog.ListRecentByProjectAsync(projectId, 20, cancellationToken);
+        return await ToDtosAsync(projectId, entries, cancellationToken);
+    }
+
+    public async Task<IReadOnlyList<ActivityLogEntryDto>?> ListTaskActivityLogAsync(
+        string ownerId, Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    {
+        if (!await projects.ExistsForOwnerAsync(projectId, ownerId, cancellationToken)
+            || await tasks.GetAsync(projectId, taskId, cancellationToken) is null)
+        {
+            return null;
+        }
+
+        var entries = await activityLog.ListByTaskAsync(projectId, taskId, cancellationToken);
         return await ToDtosAsync(projectId, entries, cancellationToken);
     }
 

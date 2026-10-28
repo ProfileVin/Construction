@@ -15,8 +15,14 @@ public interface IChangeOrderRepository
     Task<ChangeOrderTotals> GetTotalsAsync(Guid projectId, CancellationToken cancellationToken);
 
     Task AddAsync(ChangeOrder changeOrder, CancellationToken cancellationToken);
+
+    Task AddAttachmentAsync(ChangeOrderAttachment attachment, CancellationToken cancellationToken);
+
+    /// <summary>The change order's attached documents, in upload order.</summary>
+    Task<IReadOnlyList<ProjectDocument>> ListAttachmentsAsync(Guid changeOrderId, CancellationToken cancellationToken);
 }
 
+/// <summary><paramref name="Pending"/> covers both approval steps (GC review and owner sign-off).</summary>
 public record ChangeOrderTotals(decimal Pending, decimal Approved, decimal Rejected)
 {
     /// <summary>Rejected change orders are excluded — they never reach the contract.</summary>

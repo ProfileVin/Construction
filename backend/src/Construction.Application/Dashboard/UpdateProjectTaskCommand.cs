@@ -15,6 +15,14 @@ public enum TaskUpdateStatus
     Updated,
     NotFound,
     DeadlineBeforeAssigned,
+    DeadlineNotLater,
+}
+
+/// <summary>The reasons a deadline extension can be logged with (Schedule → View Details).</summary>
+public static class DeadlineExtensionReasons
+{
+    public static readonly IReadOnlyList<string> All =
+        ["Weather Delay", "Material Shortage", "Labor Shortage", "Design Change", "Inspection Delay", "Permit Delay", "Other"];
 }
 
 public record TaskUpdateResult(TaskUpdateStatus Status, ProjectTaskDto? Task = null);

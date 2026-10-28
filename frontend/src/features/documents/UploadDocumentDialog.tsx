@@ -2,13 +2,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { isAxiosError } from 'axios'
 import { Button } from 'primereact/button'
 import { Dialog } from 'primereact/dialog'
-import { Dropdown } from 'primereact/dropdown'
 import { InputText } from 'primereact/inputtext'
 import { ProgressBar } from 'primereact/progressbar'
 import { useRef, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { formatFileSize } from '../../lib/format'
-import { usePhases } from '../schedule/schedule.hooks'
 import { useUploadDocument } from './documents.hooks'
 import { ALLOWED_EXTENSIONS, uploadDocumentSchema, type UploadDocumentValues } from './documents.schema'
 
@@ -31,7 +29,6 @@ interface UploadDocumentDialogProps {
 
 export function UploadDocumentDialog({ projectId, visible, onHide }: UploadDocumentDialogProps) {
   const upload = useUploadDocument(projectId)
-  const { data: phases } = usePhases(projectId)
   const [progress, setProgress] = useState(0)
   const [dragging, setDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -43,7 +40,7 @@ export function UploadDocumentDialog({ projectId, visible, onHide }: UploadDocum
     formState: { errors },
   } = useForm<UploadDocumentValues>({
     resolver: zodResolver(uploadDocumentSchema),
-    defaultValues: { name: '', phaseId: null },
+    defaultValues: { name: '' },
   })
 
   const close = () => {
@@ -59,34 +56,63 @@ export function UploadDocumentDialog({ projectId, visible, onHide }: UploadDocum
     await upload.mutateAsync({
       file: values.file,
       name: values.name?.trim() || undefined,
-      phaseId: values.phaseId ?? null,
       onProgress: setProgress,
     })
     close()
   })
 
+  const labelClass = 'text-[14px] font-medium text-slate-900'
+
   return (
     <Dialog
-      header="Upload document"
+      header="Upload New Document"
       visible={visible}
       onHide={close}
       modal
       dismissableMask={!upload.isPending}
       closable={!upload.isPending}
-      style={{ width: '30rem' }}
-      className="mx-4"
+      draggable={false}
+      style={{ width: '40rem' }}
+      className="form-dialog mx-4"
     >
-      <form onSubmit={submit} className="flex flex-col gap-5">
+      <form onSubmit={submit} className="flex flex-col gap-5" noValidate>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="documentName" className={labelClass}>
+            Document Title / Display Name
+          </label>
+          <Controller
+            name="name"
+            control={control}
+            render={({ field }) => (
+              <InputText
+                id="documentName"
+                autoFocus
+                placeholder="Title"
+                className="w-full"
+                invalid={Boolean(errors.name)}
+                {...field}
+              />
+            )}
+          />
+          {errors.name && <small className="text-[13px] text-red-600">{errors.name.message}</small>}
+        </div>
+
         <Controller
           name="file"
           control={control}
           render={({ field }) => {
             const pick = (file: File | undefined) => file && field.onChange(file)
             return (
-              <div className="flex flex-col gap-2">
-                <span className="text-[15px] font-semibold text-slate-800">File</span>
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-baseline justify-between gap-3">
+                  <span id="documentFileLabel" className={labelClass}>
+                    Source File Attachment
+                  </span>
+                  <span className="text-xs font-semibold text-slate-500">Max: 100 MB</span>
+                </div>
                 <button
                   type="button"
+                  aria-labelledby="documentFileLabel"
                   onClick={() => fileInputRef.current?.click()}
                   onDragOver={(e) => {
                     e.preventDefault()
@@ -98,20 +124,32 @@ export function UploadDocumentDialog({ projectId, visible, onHide }: UploadDocum
                     setDragging(false)
                     pick(e.dataTransfer.files[0])
                   }}
-                  className={`flex flex-col items-center gap-2 rounded-xl border-2 border-dashed px-4 py-8 text-center transition-colors ${
-                    dragging ? 'border-brand bg-brand/5' : errors.file ? 'border-red-300' : 'border-slate-300 hover:border-brand'
+                  className={`flex flex-col items-center gap-3 rounded-xl border-2 border-dashed px-6 py-7 text-center transition-colors ${
+                    dragging
+                      ? 'border-brand bg-brand/5'
+                      : errors.file
+                        ? 'border-red-300 bg-slate-100'
+                        : 'border-slate-300 bg-slate-100 hover:border-brand'
                   }`}
                 >
-                  <i className="pi pi-cloud-upload text-3xl text-brand" aria-hidden />
+                  <span className="flex h-14 w-14 items-center justify-center rounded-full bg-white shadow-sm" aria-hidden>
+                    <i className="pi pi-cloud-upload text-2xl text-brand" />
+                  </span>
                   {field.value ? (
                     <>
-                      <span className="max-w-full truncate text-sm font-semibold text-slate-800">{field.value.name}</span>
-                      <span className="text-xs text-slate-500">{formatFileSize(field.value.size)} · click to change</span>
+                      <span className="max-w-full truncate text-base font-semibold text-slate-900" title={field.value.name}>
+                        {field.value.name}
+                      </span>
+                      <span className="text-sm text-slate-500">{formatFileSize(field.value.size)} · click to change</span>
                     </>
                   ) : (
                     <>
-                      <span className="text-sm font-semibold text-slate-800">Drop a file here or click to browse</span>
-                      <span className="text-xs text-slate-500">Images, PDF, Word, Excel, CAD · up to 100 MB</span>
+                      <span className="text-[17px] font-semibold text-slate-900">
+                        Drag and drop files here, or <span className="text-brand underline">browse files</span>
+                      </span>
+                      <span className="max-w-md text-sm text-slate-500">
+                        Supports DWG, DXF, IFC, PDF, XLSX, DOCX, PNG, and high-res scan bundles.
+                      </span>
                     </>
                   )}
                 </button>
@@ -131,49 +169,6 @@ export function UploadDocumentDialog({ projectId, visible, onHide }: UploadDocum
           }}
         />
 
-        <div className="flex flex-col gap-2">
-          <label htmlFor="documentName" className="text-[15px] font-semibold text-slate-800">
-            Display name <span className="font-normal text-slate-500">(optional)</span>
-          </label>
-          <Controller
-            name="name"
-            control={control}
-            render={({ field }) => (
-              <InputText
-                id="documentName"
-                placeholder="Defaults to the file name"
-                className="w-full"
-                invalid={Boolean(errors.name)}
-                {...field}
-              />
-            )}
-          />
-          {errors.name && <small className="text-[13px] text-red-600">{errors.name.message}</small>}
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <label htmlFor="documentPhase" className="text-[15px] font-semibold text-slate-800">
-            Phase <span className="font-normal text-slate-500">(optional)</span>
-          </label>
-          <Controller
-            name="phaseId"
-            control={control}
-            render={({ field }) => (
-              <Dropdown
-                inputId="documentPhase"
-                value={field.value ?? null}
-                options={(phases ?? []).map((p) => ({ label: p.name, value: p.id }))}
-                optionLabel="label"
-                optionValue="value"
-                placeholder="No phase"
-                showClear
-                onChange={(e) => field.onChange(e.value)}
-                className="w-full"
-              />
-            )}
-          />
-        </div>
-
         {upload.isPending && <ProgressBar value={progress} style={{ height: '8px' }} showValue={false} />}
 
         {upload.isError && (
@@ -182,9 +177,9 @@ export function UploadDocumentDialog({ projectId, visible, onHide }: UploadDocum
           </div>
         )}
 
-        <div className="flex justify-end gap-3">
+        <div className="form-dialog-actions mt-1 grid grid-cols-1 gap-3 sm:grid-cols-2 sm:gap-8">
           <Button type="button" label="Cancel" outlined onClick={close} disabled={upload.isPending} />
-          <Button type="submit" label="Upload" icon="pi pi-upload" loading={upload.isPending} />
+          <Button type="submit" label="Upload" loading={upload.isPending} />
         </div>
       </form>
     </Dialog>

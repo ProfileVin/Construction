@@ -20,7 +20,7 @@ foundation (auth + app shell); feature screens are built on top incrementally.
 | Layer     | Tech |
 | --------- | ---- |
 | Frontend  | React 19, TypeScript, Vite 8, Tailwind CSS v4, PrimeReact + PrimeIcons, React Router 7, TanStack Query 5, Axios, Zustand, React Hook Form, Zod, Day.js |
-| Backend   | .NET 10, ASP.NET Core Web API (minimal APIs), EF Core (SQL Server), ASP.NET Core Identity, JWT bearer, FluentValidation, Mapster, Serilog, OpenAPI + Scalar |
+| Backend   | .NET 10, ASP.NET Core Web API (MVC Controllers), EF Core (SQL Server), ASP.NET Core Identity, JWT bearer, FluentValidation, Serilog, OpenAPI + Scalar |
 | Database  | SQL Server — LocalDB (`(localdb)\MSSQLLocalDB`, db `Construction`) in dev |
 | Tooling   | oxlint, dotnet-ef, Vite dev proxy (`/api` → `:5080`) |
 

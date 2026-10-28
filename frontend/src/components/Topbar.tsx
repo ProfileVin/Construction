@@ -9,16 +9,8 @@ import { NavLinks } from './NavLinks'
 import { NAV_ITEMS } from './navItems'
 import { SidebarLogo } from './SidebarLogo'
 import { useSelectedProject } from '../features/dashboard/dashboard.hooks'
+import { initials } from '../lib/format'
 import { useAuthStore } from '../stores/authStore'
-
-function initials(fullName: string | undefined): string {
-  if (!fullName) return '?'
-  const parts = fullName.trim().split(/\s+/)
-  return parts
-    .slice(0, 2)
-    .map((p) => p[0]?.toUpperCase())
-    .join('')
-}
 
 export function Topbar() {
   const navigate = useNavigate()

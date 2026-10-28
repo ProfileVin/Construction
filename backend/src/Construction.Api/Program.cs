@@ -118,7 +118,7 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        await DbSeeder.SeedAsync(app.Services);
+        //await DbSeeder.SeedAsync(app.Services);
     }
 
     app.Run();

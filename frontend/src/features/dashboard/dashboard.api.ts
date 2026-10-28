@@ -98,6 +98,21 @@ export async function updateProjectTask(
   return data
 }
 
+/** Moves the deadline later; the API logs "Deadline extended … — {reason}" on the task. */
+export async function extendTaskDeadline(
+  projectId: string,
+  taskId: string,
+  payload: { deadline: string; reason: string },
+): Promise<ProjectTask> {
+  const { data } = await api.post<ProjectTask>(`/projects/${projectId}/tasks/${taskId}/extend-deadline`, payload)
+  return data
+}
+
+export async function listTaskActivityLog(projectId: string, taskId: string): Promise<ActivityLogEntry[]> {
+  const { data } = await api.get<ActivityLogEntry[]>(`/projects/${projectId}/tasks/${taskId}/activity-log`)
+  return data
+}
+
 export async function listActivityLog(projectId: string): Promise<ActivityLogEntry[]> {
   const { data } = await api.get<ActivityLogEntry[]>(`/projects/${projectId}/activity-log`)
   return data

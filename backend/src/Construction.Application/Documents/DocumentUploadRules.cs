@@ -13,7 +13,7 @@ public static class DocumentUploadRules
         ".pdf",
         ".doc", ".docx", ".odt", ".rtf",
         ".xls", ".xlsx", ".csv", ".ods",
-        ".dwg", ".dxf", ".txt", ".zip",
+        ".dwg", ".dxf", ".ifc", ".txt", ".zip",
     };
 
     public static bool IsAllowedExtension(string fileName) =>

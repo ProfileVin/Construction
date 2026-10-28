@@ -3,8 +3,10 @@ import { useProjectStore } from '../../stores/projectStore'
 import {
   createActivityLog,
   createProjectTask,
+  extendTaskDeadline,
   listActivityLog,
   listProjectTasks,
+  listTaskActivityLog,
   updateActivityLog,
   updateProjectTask,
   type UpdateProjectTaskPayload,
@@ -51,6 +53,24 @@ export function useUpdateProjectTask(projectId: string | undefined) {
     mutationFn: ({ taskId, payload }: { taskId: string; payload: UpdateProjectTaskPayload }) =>
       updateProjectTask(projectId as string, taskId, payload),
     onSuccess: () => invalidateTaskQueries(qc, projectId),
+  })
+}
+
+export function useExtendTaskDeadline(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ taskId, deadline, reason }: { taskId: string; deadline: string; reason: string }) =>
+      extendTaskDeadline(projectId as string, taskId, { deadline, reason }),
+    onSuccess: () => invalidateTaskQueries(qc, projectId),
+  })
+}
+
+/** Keyed under the project's activity-log key, so every activity-log invalidation refreshes it too. */
+export function useTaskActivityLog(projectId: string | undefined, taskId: string | undefined) {
+  return useQuery({
+    queryKey: ['dashboard', 'activity-log', projectId, taskId],
+    queryFn: () => listTaskActivityLog(projectId as string, taskId as string),
+    enabled: Boolean(projectId && taskId),
   })
 }
 

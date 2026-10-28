@@ -7,6 +7,7 @@ import { ChangeOrdersPanel } from '../features/change-orders/ChangeOrdersPanel'
 import { BudgetSummaryCard } from '../features/dashboard/BudgetSummaryCard'
 import { useSelectedProject } from '../features/dashboard/dashboard.hooks'
 import { InvoicesTabPanel } from '../features/invoices/InvoicesTabPanel'
+import { PaymentsPanel } from '../features/payments/PaymentsPanel'
 import { NewProjectDialog } from '../features/projects/NewProjectDialog'
 import { PurchaseOrdersPanel } from '../features/purchase-orders/PurchaseOrdersPanel'
 import { BudgetTabs } from '../features/budget/BudgetTabs'
@@ -94,6 +95,8 @@ export function BudgetPage() {
         <ChangeOrdersPanel projectId={project.id} currencyCode={currencyCode} />
       ) : tab === 'invoices' ? (
         <InvoicesTabPanel projectId={project.id} currencyCode={currencyCode} />
+      ) : tab === 'payments' ? (
+        <PaymentsPanel projectId={project.id} currencyCode={currencyCode} />
       ) : (
         <ComingSoonPage title={BUDGET_TABS.find((t) => t.value === tab)?.label ?? ''} />
       )}

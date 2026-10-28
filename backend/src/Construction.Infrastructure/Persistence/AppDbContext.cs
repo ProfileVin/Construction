@@ -22,6 +22,10 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
     public DbSet<ChangeOrder> ChangeOrders => Set<ChangeOrder>();
 
+    public DbSet<ChangeOrderAttachment> ChangeOrderAttachments => Set<ChangeOrderAttachment>();
+
+    public DbSet<Payment> Payments => Set<Payment>();
+
     public DbSet<ProjectDocument> ProjectDocuments => Set<ProjectDocument>();
 
     public DbSet<TeamMember> TeamMembers => Set<TeamMember>();
@@ -158,6 +162,23 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             entity.Ignore(l => l.LineTotal);
         });
 
+        builder.Entity<Payment>(entity =>
+        {
+            entity.Property(p => p.PaymentNumber).HasMaxLength(40).IsRequired();
+            entity.Property(p => p.PartyName).HasMaxLength(200).IsRequired();
+            entity.Property(p => p.Direction).HasConversion<string>().HasMaxLength(40);
+            entity.Property(p => p.Method).HasConversion<string>().HasMaxLength(40);
+            entity.Property(p => p.Status).HasConversion<string>().HasMaxLength(40);
+            entity.Property(p => p.Amount).HasColumnType("decimal(18,2)");
+            entity.Property(p => p.PaymentDate).HasColumnType("date");
+            entity.Property(p => p.Notes).HasMaxLength(2000);
+            entity.HasIndex(p => new { p.ProjectId, p.Sequence }).IsUnique();
+            entity.HasOne<Project>()
+                .WithMany()
+                .HasForeignKey(p => p.ProjectId)
+                .OnDelete(DeleteBehavior.Cascade);
+        });
+
         builder.Entity<ChangeOrder>(entity =>
         {
             entity.Property(c => c.CoNumber).HasMaxLength(40).IsRequired();
@@ -165,12 +186,36 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
             entity.Property(c => c.Amount).HasColumnType("decimal(18,2)");
             entity.Property(c => c.Status).HasConversion<string>().HasMaxLength(40);
             entity.Property(c => c.RequestedDate).HasColumnType("date");
-            entity.Property(c => c.Reason).HasMaxLength(2000);
+            entity.Property(c => c.Reason).HasMaxLength(60);
+            entity.Property(c => c.Scope).HasMaxLength(2000);
+            entity.Property(c => c.RequestedByName).HasMaxLength(200);
+            entity.Property(c => c.ContractorReviewedByName).HasMaxLength(200);
+            entity.Property(c => c.OwnerDecidedByName).HasMaxLength(200);
             entity.HasIndex(c => new { c.ProjectId, c.Sequence }).IsUnique();
+            entity.HasIndex(c => c.CategoryId);
             entity.HasOne<Project>()
                 .WithMany()
                 .HasForeignKey(c => c.ProjectId)
                 .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne<BudgetCategory>()
+                .WithMany()
+                .HasForeignKey(c => c.CategoryId)
+                .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        builder.Entity<ChangeOrderAttachment>(entity =>
+        {
+            entity.HasKey(a => new { a.ChangeOrderId, a.DocumentId });
+            entity.HasIndex(a => a.DocumentId);
+            entity.HasOne<ChangeOrder>()
+                .WithMany()
+                .HasForeignKey(a => a.ChangeOrderId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Restrict for the same multiple-cascade-path reason as Invoice.ReceiptDocumentId.
+            entity.HasOne<ProjectDocument>()
+                .WithMany()
+                .HasForeignKey(a => a.DocumentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ProjectDocument>(entity =>

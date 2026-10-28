@@ -3,6 +3,7 @@ using Construction.Application.ChangeOrders;
 using Construction.Application.Common;
 using Construction.Application.Dashboard;
 using Construction.Application.Documents;
+using Construction.Application.Payments;
 using Construction.Application.Projects;
 using Construction.Application.PurchaseOrders;
 using Construction.Application.Schedule;
@@ -33,6 +34,7 @@ public static class DependencyInjection
         services.AddScoped<IInvoiceRepository, InvoiceRepository>();
         services.AddScoped<IPurchaseOrderRepository, PurchaseOrderRepository>();
         services.AddScoped<IChangeOrderRepository, ChangeOrderRepository>();
+        services.AddScoped<IPaymentRepository, PaymentRepository>();
         services.AddScoped<IProjectDocumentRepository, ProjectDocumentRepository>();
         services.AddScoped<ITeamMemberRepository, TeamMemberRepository>();
         services.AddScoped<IUserDirectory, UserDirectory>();

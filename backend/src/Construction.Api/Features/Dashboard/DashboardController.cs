@@ -82,6 +82,44 @@ public class DashboardController(IDashboardService dashboardService) : Controlle
         };
     }
 
+    [HttpPost("tasks/{taskId:guid}/extend-deadline")]
+    public async Task<IResult> ExtendTaskDeadlineAsync(
+        Guid projectId, Guid taskId, [FromBody] ExtendTaskDeadlineRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        // Deadline and a known Reason are guaranteed by ExtendTaskDeadlineRequestValidator.
+        var result = await dashboardService.ExtendTaskDeadlineAsync(
+            userId, projectId, taskId, request.Deadline!.Value, request.Reason!, cancellationToken);
+
+        return result.Status switch
+        {
+            TaskUpdateStatus.Updated => Results.Ok(ProjectTaskDto.From(result.Task!)),
+            TaskUpdateStatus.DeadlineNotLater => Results.ValidationProblem(new Dictionary<string, string[]>
+            {
+                ["deadline"] = ["New deadline must be after the current one."],
+            }),
+            _ => Results.NotFound(),
+        };
+    }
+
+    [HttpGet("tasks/{taskId:guid}/activity-log")]
+    public async Task<IResult> ListTaskActivityLogAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        var entries = await dashboardService.ListTaskActivityLogAsync(userId, projectId, taskId, cancellationToken);
+        return entries is null ? Results.NotFound() : Results.Ok(entries.Select(ActivityLogEntryDto.From));
+    }
+
     [HttpGet("activity-log")]
     public async Task<IResult> ListActivityLogAsync(Guid projectId, CancellationToken cancellationToken)
     {
