@@ -12,6 +12,9 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.12" />
+    <!-- Security pin (BUG-014): Microsoft.Data.SqlClient 6.1.6 pulls in Pkcs 9.0.11, which has
+         CVE-2026-70162 / CVE-2026-84008 (fixed in 10.0.13). Drop this once SqlClient brings a patched one. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
   </ItemGroup>
 
   <PropertyGroup>

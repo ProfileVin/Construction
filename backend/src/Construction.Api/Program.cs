@@ -2,13 +2,14 @@ using System.Text;
 using System.Text.Json.Serialization;
 using Construction.Api.Auth;
 using Construction.Api.Common;
+using Construction.Api.Features.Auth;
 using Construction.Application;
 using Construction.Infrastructure;
 using Construction.Infrastructure.Persistence;
+using Construction.Infrastructure.Storage;
 using FluentValidation;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
 using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 using Serilog;
@@ -40,6 +41,10 @@ try
 
     services.AddInfrastructure(config);
     services.AddApplication();
+
+    // Relative FileStorage:RootPath resolves against the Api's content root (absolute paths pass through).
+    services.PostConfigure<LocalFileStorageOptions>(options =>
+        options.RootPath = Path.Combine(builder.Environment.ContentRootPath, options.RootPath));
 
     services.ConfigureHttpJsonOptions(options =>
         options.SerializerOptions.Converters.Add(new JsonStringEnumConverter()));
@@ -113,7 +118,7 @@ try
 
     if (app.Environment.IsDevelopment())
     {
-        await DbSeeder.SeedAsync(app.Services);
+        //await DbSeeder.SeedAsync(app.Services);
     }
 
     app.Run();

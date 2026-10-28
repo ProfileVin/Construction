@@ -17,6 +17,21 @@ public class ActivityLogRepository(AppDbContext db) : IActivityLogRepository
             .ToListAsync(cancellationToken);
     }
 
+    public async Task<IReadOnlyList<ActivityLogEntry>> ListByTaskAsync(
+        Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    {
+        return await db.ActivityLogEntries
+            .Where(e => e.ProjectId == projectId && e.ProjectTaskId == taskId)
+            .OrderByDescending(e => e.OccurredAt)
+            .ToListAsync(cancellationToken);
+    }
+
+    public Task<int> CountByProjectAsync(Guid projectId, CancellationToken cancellationToken) =>
+        db.ActivityLogEntries.CountAsync(e => e.ProjectId == projectId, cancellationToken);
+
+    public Task<ActivityLogEntry?> GetAsync(Guid projectId, Guid entryId, CancellationToken cancellationToken) =>
+        db.ActivityLogEntries.FirstOrDefaultAsync(e => e.ProjectId == projectId && e.Id == entryId, cancellationToken);
+
     public Task AddAsync(ActivityLogEntry entry, CancellationToken cancellationToken)
     {
         db.ActivityLogEntries.Add(entry);

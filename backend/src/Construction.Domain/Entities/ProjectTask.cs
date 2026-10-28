@@ -1,5 +1,12 @@
 namespace Construction.Domain.Entities;
 
+public enum ProjectTaskStatus
+{
+    Upcoming,
+    InProgress,
+    Completed,
+}
+
 public class ProjectTask
 {
     public Guid Id { get; private set; }
@@ -8,6 +15,9 @@ public class ProjectTask
     public string AssigneeName { get; private set; } = string.Empty;
     public DateOnly AssignedDate { get; private set; }
     public DateOnly Deadline { get; private set; }
+    public Guid? PhaseId { get; private set; }
+    public ProjectTaskStatus Status { get; private set; }
+    public Guid? AttachmentDocumentId { get; private set; }
     public DateTime CreatedAt { get; private set; }
     public DateTime UpdatedAt { get; private set; }
 
@@ -21,7 +31,26 @@ public class ProjectTask
         string assigneeName,
         DateOnly assignedDate,
         DateOnly deadline,
-        DateTime nowUtc)
+        Guid? phaseId,
+        ProjectTaskStatus status,
+        DateTime nowUtc,
+        Guid? attachmentDocumentId = null)
+    {
+        var task = new ProjectTask
+        {
+            Id = Guid.NewGuid(),
+            ProjectId = projectId,
+            AssignedDate = assignedDate,
+            AttachmentDocumentId = attachmentDocumentId,
+            CreatedAt = nowUtc,
+        };
+        task.Update(title, assigneeName, deadline, phaseId, status, nowUtc);
+        return task;
+    }
+
+    /// <summary>The assigned date and attachment are fixed once a task is created.</summary>
+    public void Update(
+        string title, string assigneeName, DateOnly deadline, Guid? phaseId, ProjectTaskStatus status, DateTime nowUtc)
     {
         if (string.IsNullOrWhiteSpace(title))
         {
@@ -33,21 +62,16 @@ public class ProjectTask
             throw new ArgumentException("Assignee is required.", nameof(assigneeName));
         }
 
-        if (deadline < assignedDate)
+        if (deadline < AssignedDate)
         {
             throw new ArgumentException("Deadline must be on or after the assigned date.", nameof(deadline));
         }
 
-        return new ProjectTask
-        {
-            Id = Guid.NewGuid(),
-            ProjectId = projectId,
-            Title = title.Trim(),
-            AssigneeName = assigneeName.Trim(),
-            AssignedDate = assignedDate,
-            Deadline = deadline,
-            CreatedAt = nowUtc,
-            UpdatedAt = nowUtc,
-        };
+        Title = title.Trim();
+        AssigneeName = assigneeName.Trim();
+        Deadline = deadline;
+        PhaseId = phaseId;
+        Status = status;
+        UpdatedAt = nowUtc;
     }
 }

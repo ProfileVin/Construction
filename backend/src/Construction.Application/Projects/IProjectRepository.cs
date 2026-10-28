@@ -8,5 +8,7 @@ public interface IProjectRepository
 
     Task<bool> ExistsForOwnerAsync(Guid projectId, string ownerId, CancellationToken cancellationToken);
 
+    Task<Project?> GetForOwnerAsync(Guid projectId, string ownerId, CancellationToken cancellationToken);
+
     Task AddAsync(Project project, CancellationToken cancellationToken);
 }

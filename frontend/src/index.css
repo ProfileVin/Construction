@@ -1,3 +1,9 @@
+/* Cascade layer order (BUG-005): the Lara theme ships inside `@layer primereact`. Without
+   this declaration that layer would be declared first — i.e. lowest priority — and Tailwind's
+   preflight (`base`: `button { color: inherit }`, `* { margin: 0 }`) would override the theme.
+   Preflight sits below PrimeReact; utilities still sit above it so they can override. */
+@layer theme, base, primereact, components, utilities;
+
 /* PrimeReact base styles must load before Tailwind so utilities can override. */
 @import 'primereact/resources/themes/lara-light-teal/theme.css';
 @import 'primereact/resources/primereact.min.css';
@@ -60,11 +66,12 @@ body {
 }
 
 .p-button:not(.p-button-outlined):not(.p-button-text) {
-  border-radius: 9999px;
+  border-radius: 4px;
   background: var(--color-brand);
   border-color: var(--color-brand);
-  padding: 0.85rem 1rem;
+  padding: 7px 8px;
   font-weight: 600;
+  white-space: nowrap;
 }
 .p-button:not(.p-button-outlined):not(.p-button-text):enabled:hover {
   background: var(--color-brand-hover);
@@ -83,6 +90,70 @@ body {
 }
 .p-button.p-button-outlined:enabled:hover {
   background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+}
+
+/* Sidebar "New Project" — a rounded rectangle, not the global pill. `.p-button.p-component`
+   ties the filled rule's specificity and wins by source order (as BUG-009). */
+.p-button.p-component.sidebar-new-project {
+  border-radius: 6px;
+  justify-content: flex-start;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  font-size: 17px;
+  font-weight: 500;
+}
+.sidebar-new-project .p-button-label {
+  flex: 0 0 auto;
+  margin-left: 0.75rem;
+}
+.p-button.p-component.sidebar-new-project.p-button-icon-only {
+  justify-content: center;
+  padding: 0.85rem 0;
+}
+
+/* SelectButton — options are `.p-button`s, so opt them out of the filled-button rule above
+   (higher specificity): white segments, brand fill when selected. */
+.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text) {
+  background: #fff;
+  border-color: #e2e8f0;
+  color: #475569;
+  padding: 0.5rem 1rem;
+  font-size: 14px;
+}
+.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text):not(.p-highlight):enabled:hover {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+}
+.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text).p-highlight {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: #fff;
+}
+
+/* Schedule zoom toggle (BUG-010) — one mint pill with borderless segments, as in the mockup. */
+.schedule-zoom-toggle.p-selectbutton {
+  display: inline-flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 10px;
+  background: #ecfdf5;
+}
+.schedule-zoom-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text) {
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  box-shadow: none;
+  color: #334155;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 0.35rem 0.7rem;
+}
+.schedule-zoom-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text):not(.p-highlight):enabled:hover {
+  background: #d1fae5;
+}
+.schedule-zoom-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text).p-highlight {
+  background: var(--color-brand);
+  color: #fff;
 }
 
 /* Combined country-code + phone number field (Sign up) */
@@ -151,9 +222,18 @@ body {
   border-color: var(--color-brand);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
 }
+.p-dropdown.p-invalid {
+  border-color: #dc2626;
+}
+/* The label is also a .p-inputtext — drop that border/focus ring so it isn't a box inside the dropdown (BUG-007) */
 .p-dropdown .p-dropdown-label {
+  border: none;
+  border-radius: 0;
   padding: 0.75rem 1rem;
   font-size: 15px;
+}
+.p-dropdown .p-dropdown-label:enabled:focus {
+  box-shadow: none;
 }
 .p-dropdown .p-dropdown-label.p-placeholder {
   color: #94a3b8;
@@ -235,6 +315,187 @@ body {
 .p-datatable .p-datatable-tbody > tr:hover {
   background: color-mix(in srgb, var(--color-brand) 4%, transparent);
 }
+/* Dashboard cards (Assigned Tasks / Recent Log) — grey header band, title-case labels, tall rows,
+   single-line cells that truncate (fixed layout). `.p-datatable.dash-table` outranks the rules above. */
+.p-datatable.dash-table .p-datatable-table {
+  table-layout: fixed;
+}
+.p-datatable.dash-table .p-datatable-thead > tr > th {
+  background: #e8e8e8;
+  border-bottom: none;
+  color: #6b7280;
+  font-size: 13px;
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: nowrap;
+  padding: 0.85rem 0.75rem;
+}
+.p-datatable.dash-table .p-datatable-tbody > tr > td {
+  border-bottom: 1px solid #e5e7eb;
+  padding: 1.15rem 0.75rem;
+  font-size: 13px;
+  font-weight: 500;
+  color: #111827;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-datatable.dash-table .dash-table__center,
+.p-datatable.dash-table th.dash-table__center .p-column-header-content {
+  text-align: center;
+  justify-content: center;
+}
+.dash-link {
+  color: #2563eb;
+}
+.dash-link:hover {
+  color: #1d4ed8;
+  text-decoration: underline;
+}
+/* "Inspect >" row action on the Change Order / Invoice tables (FEAT-026/027). */
+.inspect-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  border-radius: 4px;
+  font-size: 15px;
+  font-weight: 500;
+  white-space: nowrap;
+  color: var(--color-brand);
+}
+.inspect-link .pi {
+  font-size: 0.9rem;
+}
+.inspect-link:hover {
+  text-decoration: underline;
+}
+.inspect-link:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+
+/* Paginator (Task Log / invoices). Lara-teal's active page sets text = background (#0f766e),
+   hiding the number — visible since BUG-005 stopped preflight clearing button backgrounds. */
+.p-paginator .p-paginator-element {
+  min-width: 2.25rem;
+  height: 2.25rem;
+}
+.p-paginator .p-paginator-pages .p-paginator-page.p-highlight {
+  background: var(--color-brand);
+  border-color: var(--color-brand);
+  color: #fff;
+}
+
+/* Flat search field (Documents, Team) (like .topbar-search), not a bordered input in a box */
+.flat-search {
+  border-radius: 10px;
+  background: #eef2f7;
+  padding: 0.7rem 1rem;
+}
+.flat-search .p-inputtext {
+  border: none;
+  border-radius: 0;
+  padding: 0;
+  font-size: 15px;
+  background: transparent;
+}
+.flat-search .p-inputtext:enabled:focus {
+  box-shadow: none;
+}
+.flat-search:focus-within {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-brand) 35%, transparent);
+}
+
+/* Bordered search field with a leading icon (Task Log filters) — sized like a Dropdown; the
+   wrapper owns the border/focus ring, so the inner input drops its own (BUG-008) */
+.search-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0 1rem;
+}
+.search-field:hover {
+  border-color: #94a3b8;
+}
+.search-field:focus-within {
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+.search-field .p-inputtext {
+  border: none;
+  border-radius: 0;
+  padding: 0.75rem 0;
+  background: transparent;
+}
+.search-field .p-inputtext:enabled:focus {
+  box-shadow: none;
+}
+
+/* Filter strip (Team) — white flat controls on a light-blue band */
+.toolbar-band {
+  background: #eaf2fb;
+}
+.toolbar-band .flat-search {
+  background: #fff;
+}
+.toolbar-band .p-dropdown {
+  border-color: transparent;
+  border-radius: 10px;
+}
+/* Shared list table (Documents, Team) — title-case headers + "← Previous 1 2 3 Next →" paginator, per the mockup */
+.app-table .p-datatable-thead > tr > th {
+  color: #475569;
+  font-size: 14px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.app-table .p-datatable-thead > tr > th.app-table__center .p-column-header-content {
+  justify-content: center;
+}
+.app-table .p-datatable-tbody > tr > td {
+  border-bottom-color: #e2e8f0;
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+.app-table .p-paginator,
+.app-pager.p-paginator {
+  justify-content: flex-end;
+  gap: 0.25rem;
+  padding: 1rem 0 0;
+}
+.app-table .p-paginator .p-paginator-page,
+.app-pager.p-paginator .p-paginator-page {
+  border-radius: 10px;
+  color: var(--color-brand-ink);
+  font-weight: 600;
+}
+/* Invoices (FEAT-024): grey header row, and "Showing X of Y" (paginatorLeft) opposite the pager */
+.app-table--shaded .p-datatable-thead > tr > th {
+  background: #e9eaec;
+}
+.app-table--shaded .p-paginator .p-paginator-left-content {
+  margin-right: auto;
+}
+.pager-nav {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border-radius: 10px;
+  background: #f8fafc;
+  padding: 0.5rem 1rem;
+  font-weight: 600;
+  color: var(--color-brand-ink);
+}
+.pager-nav:disabled {
+  color: #94a3b8;
+  cursor: default;
+}
+.pager-nav:not(:disabled):hover {
+  background: #f1f5f9;
+}
 
 /* Dialogs (New Project / New Task / log details) */
 .p-dialog {
@@ -252,11 +513,236 @@ body {
   padding: 0.5rem 1.5rem 1.5rem;
 }
 
+/* Form dialogs ("Assign New Task" FEAT-018, "Log details" FEAT-019) — inset divider under the
+   title, squarer 4px fields, equal full-width Cancel/Save. `.p-component` in the button selectors
+   ties/beats the global filled/outlined rules' specificity and wins by source order (as BUG-009).
+   The header is inset (for the divider), so the root must supply the white behind its margins. */
+.form-dialog {
+  background: #fff;
+}
+.form-dialog .p-dialog-header {
+  margin: 0 1.5rem;
+  padding: 1.25rem 0 0.85rem;
+  border-bottom: 1px solid #eef0f3;
+}
+.form-dialog .p-dialog-title {
+  font-size: 17px;
+  font-weight: 500;
+  color: #0f172a;
+}
+.form-dialog .p-dialog-content {
+  padding-top: 1.25rem;
+}
+.form-dialog .p-inputtext,
+.form-dialog .p-dropdown {
+  border-radius: 4px;
+  font-size: 14px;
+}
+.form-dialog .p-inputtext {
+  padding: 0.7rem 0.85rem;
+}
+.form-dialog .p-dropdown .p-dropdown-label {
+  padding: 0.7rem 0.85rem;
+  font-size: 14px;
+}
+.form-dialog .p-calendar .p-inputtext {
+  border-radius: 4px 0 0 4px;
+}
+.form-dialog .p-calendar .p-button.p-datepicker-trigger {
+  border-radius: 0 4px 4px 0;
+  color: #64748b;
+}
+.form-dialog-actions .p-button.p-component {
+  justify-content: center;
+  min-height: 2.9rem;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 500;
+}
+.form-dialog-actions .p-button.p-component.p-button-outlined {
+  background: #fff;
+}
+.form-dialog-actions .p-button .p-button-label {
+  font-weight: 500;
+}
+/* A custom two-line header (badge line + title): keep the close button on the first line. */
+.form-dialog .p-dialog-header {
+  align-items: flex-start;
+}
+/* Let long titles wrap instead of pushing the close button out of the header. */
+.form-dialog .p-dialog-title {
+  min-width: 0;
+}
+/* Compact variant ("Record New Expense", BUG-013): eight stacked fields must fit a ~800px-tall
+   viewport without the content scrolling, so trim header/content padding, field height, the
+   drop zone and the action buttons. Scoped so the other form dialogs keep the roomy sizing. */
+.form-dialog--compact .p-dialog-header {
+  padding: 0.85rem 0 0.6rem;
+}
+.form-dialog--compact .p-dialog-content {
+  padding-top: 0.85rem;
+  padding-bottom: 0.75rem;
+}
+.form-dialog--compact .p-inputtext {
+  padding: 0.45rem 0.75rem;
+  font-size: 13.5px;
+}
+.form-dialog--compact .p-dropdown .p-dropdown-label {
+  padding: 0.45rem 0.75rem;
+  font-size: 13.5px;
+}
+.form-dialog--compact .assign-task-drop {
+  padding: 0.35rem 0.85rem;
+}
+.form-dialog--compact .assign-task-drop__tile {
+  width: 2rem;
+  height: 2rem;
+  font-size: 1rem;
+}
+.form-dialog--compact .form-dialog-actions .p-button.p-component {
+  min-height: 2.4rem;
+  font-size: 15px;
+}
+/* Log details (FEAT-019): light-blue info box + borderless light-blue editable description */
+.log-info-box {
+  border-radius: 10px;
+  background: #eef3fb;
+}
+.form-dialog .p-inputtext.log-description {
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: #eef3fb;
+  padding: 0.9rem 1rem;
+  font-size: 15px;
+  line-height: 1.65;
+  color: #334155;
+}
+.form-dialog .p-inputtext.log-description:enabled:hover {
+  border-color: #d5e1f3;
+}
+.form-dialog .p-inputtext.log-description.p-invalid {
+  border-color: #dc2626;
+}
+/* "Create Purchase Order" (FEAT-025) line-item inputs: pale-blue filled, borderless until hovered/invalid.
+   `.form-dialog .p-inputtext` would otherwise win on specificity. */
+.form-dialog .p-inputtext.po-line-input {
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: #eef3fb;
+  padding: 0.6rem 0.85rem;
+  font-size: 15px;
+  color: #0f172a;
+}
+.form-dialog .p-inputtext.po-line-input:enabled:hover {
+  border-color: #d5e1f3;
+}
+.form-dialog .p-inputtext.po-line-input.p-invalid {
+  border-color: #dc2626;
+}
+/* PO row ⋮ menu: destructive item in red */
+.p-menu .po-menu-danger .p-menuitem-text,
+.p-menu .po-menu-danger .p-menuitem-icon {
+  color: #b91c1c;
+}
+/* "New Log" (FEAT-022): single-select Construction Phase chips — pale blue, brand fill when picked. */
+.log-chip {
+  border-radius: 4px;
+  background: #eef3fb;
+  padding: 0.35rem 0.7rem;
+  font-size: 14px;
+  color: #334155;
+  transition: background-color 0.15s, color 0.15s;
+}
+.log-chip:hover {
+  background: #e0e9f7;
+}
+.log-chip.is-active {
+  background: var(--color-brand);
+  color: #fff;
+}
+.log-chip:focus-visible {
+  outline: 2px solid var(--color-brand);
+  outline-offset: 2px;
+}
+.assign-task-drop {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.85rem 1rem;
+  border: 1.5px dashed #cbd5e1;
+  border-radius: 8px;
+  background: #f1f2f4;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+button.assign-task-drop:hover,
+.assign-task-drop.is-dragging {
+  border-color: var(--color-brand);
+  background: color-mix(in srgb, var(--color-brand) 5%, #f1f2f4);
+}
+button.assign-task-drop:focus-visible {
+  outline: none;
+  border-color: var(--color-brand);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 22%, transparent);
+}
+.assign-task-drop.is-invalid {
+  border-color: #fca5a5;
+}
+.assign-task-drop__tile {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 8px;
+  background: #fff;
+  color: var(--color-brand);
+  font-size: 1.1rem;
+}
+.assign-task-drop__pill {
+  flex-shrink: 0;
+  padding: 0.35rem 0.85rem;
+  border-radius: 9999px;
+  background: #fff;
+  color: #0f172a;
+  font-size: 13px;
+  font-weight: 600;
+  box-shadow: 0 1px 2px rgb(15 23 42 / 0.08);
+}
+button.assign-task-drop__pill:hover {
+  background: #f8fafc;
+}
+
 /* Avatar (topbar initials) */
 .p-avatar {
   background: var(--color-brand);
   color: #fff;
   font-weight: 600;
+}
+
+/* Calendar (date pickers, incl. range) — input + trigger button as one bordered field */
+.p-calendar {
+  width: 100%;
+  display: flex;
+}
+.p-calendar .p-inputtext {
+  border-radius: 10px 0 0 10px;
+  border-right: none;
+}
+/* The trigger is a .p-button: `.p-button` in these selectors matches the filled-button rules'
+   specificity (0,3,0 / 0,5,0 on hover), and this block comes later, so it wins (BUG-009) */
+.p-calendar .p-button.p-datepicker-trigger {
+  width: auto;
+  padding: 0 0.85rem;
+  border-radius: 0 10px 10px 0;
+  border: 1px solid #cbd5e1;
+  background: #fff;
+  color: #94a3b8;
+}
+.p-calendar .p-button.p-datepicker-trigger:enabled:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+  color: var(--color-brand);
 }
 
 /* Topbar search — pill, lighter than the bordered .p-inputtext */
@@ -267,6 +753,7 @@ body {
   min-width: 220px;
 }
 .topbar-search .p-inputtext {
+  border: none;
   border-radius: 0;
   padding: 0;
   font-size: 14px;
@@ -274,4 +761,37 @@ body {
 }
 .topbar-search .p-inputtext:enabled:focus {
   box-shadow: none;
+}
+
+/* "Record New Expense" payment status (FEAT-023) — full-width mint track with a teal border and three
+   equal segments; the picked one is brand-filled. Same shape as the schedule zoom toggle. */
+.expense-status-toggle.p-selectbutton {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 3px;
+  padding: 3px;
+  border: 1px solid #5eead4;
+  border-radius: 6px;
+  background: #f0fdf9;
+}
+.expense-status-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text) {
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  box-shadow: none;
+  color: #334155;
+  font-size: 14px;
+  font-weight: 400;
+  padding: 0.35rem 0.5rem;
+}
+.expense-status-toggle.p-selectbutton .p-button .p-button-label {
+  font-weight: inherit;
+}
+.expense-status-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text):not(.p-highlight):enabled:hover {
+  background: #d1fae5;
+}
+.expense-status-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text).p-highlight {
+  background: var(--color-brand);
+  color: #fff;
 }

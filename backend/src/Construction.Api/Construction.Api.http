@@ -1,6 +1,8 @@
 @Construction.Api_HostAddress = http://localhost:5080
 @token = REPLACE_WITH_TOKEN_FROM_LOGIN_RESPONSE
 @projectId = REPLACE_WITH_PROJECT_ID
+@entryId = REPLACE_WITH_ACTIVITY_LOG_ENTRY_ID
+@taskId = REPLACE_WITH_TASK_ID
 
 ### Reference — anonymous
 GET {{Construction.Api_HostAddress}}/api/reference/options
@@ -80,18 +82,176 @@ Content-Type: application/json
 GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks
 Authorization: Bearer {{token}}
 
-### Dashboard — create task
+### Dashboard — create task (multipart; add an "attachment" file part to attach a document, max 25 MB)
 POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=task
+
+--task
+Content-Disposition: form-data; name="title"
+
+Pour foundation slab
+--task
+Content-Disposition: form-data; name="assigneeName"
+
+Miguel Torres
+--task
+Content-Disposition: form-data; name="assignedDate"
+
+2026-09-15
+--task
+Content-Disposition: form-data; name="deadline"
+
+2026-09-22
+--task--
+
+### Dashboard — edit a task (a status change also adds an activity-log row; phaseId may be null)
+PUT {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks/{{taskId}}
 Authorization: Bearer {{token}}
 Content-Type: application/json
 
 {
   "title": "Pour foundation slab",
   "assigneeName": "Miguel Torres",
-  "assignedDate": "2026-09-15",
-  "deadline": "2026-09-22"
+  "deadline": "2026-09-29",
+  "phaseId": null,
+  "status": "InProgress"
 }
 
 ### Dashboard — activity log
 GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/activity-log
+Authorization: Bearer {{token}}
+
+### Task Log — "New Log" on a task (multipart; category is one of Framing/Structural/Finishing/Electrical/Mechanical/Plumbing; optional "attachment" file part, max 25 MB)
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/activity-log
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=log
+
+--log
+Content-Disposition: form-data; name="taskId"
+
+{{taskId}}
+--log
+Content-Disposition: form-data; name="category"
+
+Structural
+--log
+Content-Disposition: form-data; name="assigneeName"
+
+Miguel Torres
+--log
+Content-Disposition: form-data; name="note"
+
+Beam pockets inspected; OK to set the second-floor joists.
+--log--
+
+### Budget — record an expense (multipart; status Pending/Paid/Scheduled; omit referenceNumber to get INV-{year}-{seq}; optional "receipt" file part, max 25 MB)
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/invoices
+Authorization: Bearer {{token}}
+Content-Type: multipart/form-data; boundary=expense
+
+--expense
+Content-Disposition: form-data; name="vendorName"
+
+Pioneer Wire & Cable
+--expense
+Content-Disposition: form-data; name="amount"
+
+4259.87
+--expense
+Content-Disposition: form-data; name="status"
+
+Scheduled
+--expense
+Content-Disposition: form-data; name="issuedDate"
+
+2026-10-13
+--expense
+Content-Disposition: form-data; name="referenceNumber"
+
+#1234fre
+--expense
+Content-Disposition: form-data; name="notes"
+
+Conduit and cable for the level 2 rough-in.
+--expense--
+
+### Dashboard — edit an activity-log description
+PUT {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/activity-log/{{entryId}}
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "description": "Completed installation of recessed ceiling downlight enclosures."
+}
+
+### Purchase orders — list (search PO# / vendor / item, filter by status)
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/purchase-orders?search=wire&status=Pending&page=1&pageSize=8
+Authorization: Bearer {{token}}
+
+### Purchase orders — KPI summary
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/purchase-orders/summary
+Authorization: Bearer {{token}}
+
+### Purchase orders — create
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/purchase-orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "vendorName": "Electrical Supply Co.",
+  "lineItems": [
+    { "description": "Electrical materials", "quantity": 5, "unitPrice": 4000 },
+    { "description": "Plumbing supplies", "quantity": 3, "unitPrice": 2500 }
+  ],
+  "deliveryDate": "2026-11-15",
+  "notes": "Level 2 rough-in."
+}
+
+### Purchase orders — mark as paid
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/purchase-orders/{{purchaseOrderId}}/mark-paid
+Authorization: Bearer {{token}}
+
+### Purchase orders — delete (Pending only; Paid → 409)
+DELETE {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/purchase-orders/{{purchaseOrderId}}
+Authorization: Bearer {{token}}
+
+### Change orders — list (search CO# / description / reason, filter by status Pending/Approved/Rejected)
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/change-orders?search=hvac&status=Pending&page=1&pageSize=8
+Authorization: Bearer {{token}}
+
+### Change orders — KPI summary (total = Pending + Approved)
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/change-orders/summary
+Authorization: Bearer {{token}}
+
+### Change orders — create
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/change-orders
+Authorization: Bearer {{token}}
+Content-Type: application/json
+
+{
+  "description": "Upgrade to LED lighting",
+  "amount": 1234.99,
+  "requestedDate": "2026-10-22",
+  "reason": "Owner request"
+}
+
+### Change orders — approve (Pending only; otherwise 409)
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/change-orders/{{changeOrderId}}/approve
+Authorization: Bearer {{token}}
+
+### Change orders — reject (Pending only; otherwise 409)
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/change-orders/{{changeOrderId}}/reject
+Authorization: Bearer {{token}}
+
+### Invoices — list (search INV# / vendor, filter by status Pending/Paid/Scheduled)
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/invoices?search=hvac&status=Pending&page=1&pageSize=8
+Authorization: Bearer {{token}}
+
+### Invoices — KPI summary (contract value = budget + approved change orders)
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/invoices/summary
+Authorization: Bearer {{token}}
+
+### Invoices — mark as paid
+POST {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/budget/invoices/{{invoiceId}}/mark-paid
 Authorization: Bearer {{token}}

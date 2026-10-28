@@ -9,8 +9,13 @@ public record ProjectTaskDto(
     string AssigneeName,
     DateOnly AssignedDate,
     DateOnly Deadline,
+    Guid? PhaseId,
+    string? PhaseName,
+    ProjectTaskStatus Status,
+    Guid? AttachmentDocumentId,
     DateTime CreatedAt)
 {
-    public static ProjectTaskDto From(ProjectTask t) => new(
-        t.Id, t.ProjectId, t.Title, t.AssigneeName, t.AssignedDate, t.Deadline, t.CreatedAt);
+    public static ProjectTaskDto From(ProjectTask t, string? phaseName) => new(
+        t.Id, t.ProjectId, t.Title, t.AssigneeName, t.AssignedDate, t.Deadline,
+        t.PhaseId, phaseName, t.Status, t.AttachmentDocumentId, t.CreatedAt);
 }

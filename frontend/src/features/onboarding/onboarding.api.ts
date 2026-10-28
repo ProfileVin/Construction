@@ -41,7 +41,9 @@ export interface PreferencesPayload {
 }
 
 export async function getOnboardingOptions(): Promise<OnboardingOptions> {
-  const { data } = await api.get<OnboardingOptions>('/onboarding/options')
+  // NOTE: GET /api/onboarding/options was never mapped (BUG-004) — the reference endpoint
+  // already serves these same seeded lists (its response is a superset of OnboardingOptions).
+  const { data } = await api.get<OnboardingOptions>('/reference/options')
   return data
 }
 
