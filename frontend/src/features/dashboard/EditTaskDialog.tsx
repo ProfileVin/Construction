@@ -69,9 +69,12 @@ export function EditTaskDialog({ task, onHide }: EditTaskDialogProps) {
       payload: {
         title: values.title,
         assigneeName: values.assigneeName,
+        // Not editable here; sent unchanged so the PUT keeps them.
+        assignedDate: task.assignedDate,
         deadline: dayjs(values.deadline).format('YYYY-MM-DD'),
         phaseId: values.phaseId,
         status: values.status,
+        description: task.description,
       },
     })
     close()

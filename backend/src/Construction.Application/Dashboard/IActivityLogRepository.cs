@@ -15,4 +15,7 @@ public interface IActivityLogRepository
     Task<ActivityLogEntry?> GetAsync(Guid projectId, Guid entryId, CancellationToken cancellationToken);
 
     Task AddAsync(ActivityLogEntry entry, CancellationToken cancellationToken);
+
+    /// <summary>Queues removal of every entry on the task (its FK is Restrict, so this precedes deleting the task).</summary>
+    Task RemoveByTaskAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken);
 }

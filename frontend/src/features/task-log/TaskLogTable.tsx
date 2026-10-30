@@ -3,9 +3,9 @@ import { Column } from 'primereact/column'
 import { DataTable } from 'primereact/datatable'
 import { useState } from 'react'
 import { StatusBadge } from '../../components/StatusBadge'
-import { TaskDetailsDialog } from '../dashboard/TaskDetailsDialog'
 import type { ProjectTask } from '../dashboard/dashboard.api'
 import type { PagedTasks } from './taskLog.api'
+import { TaskLogDetailsDialog } from './TaskLogDetailsDialog'
 
 interface TaskLogTableProps {
   data: PagedTasks | undefined
@@ -64,7 +64,7 @@ export function TaskLogTable({ data, isLoading, page, pageSize, onPageChange }: 
         />
       </DataTable>
 
-      <TaskDetailsDialog task={selected} onHide={() => setSelected(null)} />
+      <TaskLogDetailsDialog task={selected} onHide={() => setSelected(null)} />
     </div>
   )
 }

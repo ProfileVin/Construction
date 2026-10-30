@@ -105,18 +105,45 @@ Content-Disposition: form-data; name="deadline"
 2026-09-22
 --task--
 
-### Dashboard — edit a task (a status change also adds an activity-log row; phaseId may be null)
+### Dashboard — get one task with its attachments (Task Log → View Details)
+GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks/{{taskId}}
+Authorization: Bearer {{token}}
+
+### Dashboard — edit a task (multipart; a status change also adds an activity-log row; omit phaseId for none;
+### add "attachments" file parts to attach, "removeAttachmentIds" parts to unlink documents)
 PUT {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks/{{taskId}}
 Authorization: Bearer {{token}}
-Content-Type: application/json
+Content-Type: multipart/form-data; boundary=task
 
-{
-  "title": "Pour foundation slab",
-  "assigneeName": "Miguel Torres",
-  "deadline": "2026-09-29",
-  "phaseId": null,
-  "status": "InProgress"
-}
+--task
+Content-Disposition: form-data; name="title"
+
+Pour foundation slab
+--task
+Content-Disposition: form-data; name="assigneeName"
+
+Miguel Torres
+--task
+Content-Disposition: form-data; name="assignedDate"
+
+2026-09-15
+--task
+Content-Disposition: form-data; name="deadline"
+
+2026-09-29
+--task
+Content-Disposition: form-data; name="status"
+
+OnHold
+--task
+Content-Disposition: form-data; name="description"
+
+Formwork inspected; waiting on the concrete delivery.
+--task--
+
+### Dashboard — delete a task and its activity-log entries (its documents stay in the library)
+DELETE {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/tasks/{{taskId}}
+Authorization: Bearer {{token}}
 
 ### Dashboard — activity log
 GET {{Construction.Api_HostAddress}}/api/projects/{{projectId}}/activity-log

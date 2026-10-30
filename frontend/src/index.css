@@ -77,6 +77,15 @@ body {
   background: var(--color-brand-hover);
   border-color: var(--color-brand-hover);
 }
+/* Destructive confirms (Delete Log) — `severity="danger"` keeps red instead of the brand fill above. */
+.p-button.p-button-danger:not(.p-button-outlined):not(.p-button-text) {
+  background: #ef4444;
+  border-color: #ef4444;
+}
+.p-button.p-button-danger:not(.p-button-outlined):not(.p-button-text):enabled:hover {
+  background: #dc2626;
+  border-color: #dc2626;
+}
 .p-button:focus-visible {
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-brand) 30%, transparent);
 }
@@ -90,6 +99,28 @@ body {
 }
 .p-button.p-button-outlined:enabled:hover {
   background: color-mix(in srgb, var(--color-brand) 8%, transparent);
+}
+
+/* Delete Log Entry? (FEAT-034): square-ish, regular-weight buttons; grey-outlined Cancel, as in the mockup.
+   `.p-button.p-component` ties the filled rule's specificity and wins by source order (as BUG-009). */
+.delete-confirm-dialog .p-button.p-component {
+  border-radius: 6px;
+  padding: 0.7rem 1rem;
+  font-weight: 500;
+}
+.delete-confirm-dialog .p-button .p-button-label {
+  font-weight: inherit;
+}
+.delete-confirm-dialog .p-button.p-button-outlined {
+  border: 1px solid #94a3b8;
+  color: #0f172a;
+}
+.delete-confirm-dialog .p-button.p-button-outlined:enabled:hover {
+  background: #f8fafc;
+}
+.delete-confirm-dialog .p-button.p-button-danger:not(.p-button-outlined):not(.p-button-text) {
+  background: #ff3b3b;
+  border-color: #ff3b3b;
 }
 
 /* Sidebar "New Project" — a rounded rectangle, not the global pill. `.p-button.p-component`
@@ -794,4 +825,14 @@ button.assign-task-drop__pill:hover {
 .expense-status-toggle.p-selectbutton .p-button:not(.p-button-outlined):not(.p-button-text).p-highlight {
   background: var(--color-brand);
   color: #fff;
+}
+
+/* Edit Task Log status — same toggle with four segments (two rows on phones). */
+.task-log-status-toggle.p-selectbutton {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+@media (min-width: 640px) {
+  .task-log-status-toggle.p-selectbutton {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }

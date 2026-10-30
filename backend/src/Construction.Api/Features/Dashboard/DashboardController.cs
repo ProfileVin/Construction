@@ -1,4 +1,5 @@
 using Construction.Api.Common;
+using Construction.Api.Features.ChangeOrders;
 using Construction.Application.Dashboard;
 using Construction.Application.Documents;
 using Microsoft.AspNetCore.Authorization;
@@ -13,6 +14,10 @@ public class DashboardController(IDashboardService dashboardService) : Controlle
 {
     // Multipart framing adds a little on top of the attachment itself.
     private const long MaxRequestBytes = DocumentUploadRules.TaskAttachmentMaxSizeBytes + (1024 * 1024);
+
+    // Edit allows several files, each at its limit (same cap as change orders).
+    private const long MaxUpdateRequestBytes =
+        (CreateChangeOrderRequestValidator.MaxAttachments * DocumentUploadRules.TaskAttachmentMaxSizeBytes) + (1024 * 1024);
 
     [HttpGet("tasks")]
     public async Task<IResult> ListTasksAsync(Guid projectId, CancellationToken cancellationToken)
@@ -56,9 +61,8 @@ public class DashboardController(IDashboardService dashboardService) : Controlle
             : Results.Created($"/api/projects/{projectId}/tasks/{task.Id}", ProjectTaskDto.From(task));
     }
 
-    [HttpPut("tasks/{taskId:guid}")]
-    public async Task<IResult> UpdateTaskAsync(
-        Guid projectId, Guid taskId, [FromBody] UpdateProjectTaskRequest request, CancellationToken cancellationToken)
+    [HttpGet("tasks/{taskId:guid}")]
+    public async Task<IResult> GetTaskAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken)
     {
         var userId = User.GetUserId();
         if (userId is null)
@@ -66,20 +70,65 @@ public class DashboardController(IDashboardService dashboardService) : Controlle
             return Results.Unauthorized();
         }
 
-        // Non-empty Title/AssigneeName are guaranteed by UpdateProjectTaskRequestValidator.
-        var command = new UpdateProjectTaskCommand(
-            request.Title!, request.AssigneeName!, request.Deadline, request.PhaseId, request.Status);
-        var result = await dashboardService.UpdateTaskAsync(userId, projectId, taskId, command, cancellationToken);
+        var task = await dashboardService.GetTaskAsync(userId, projectId, taskId, cancellationToken);
+        return task is null ? Results.NotFound() : Results.Ok(ProjectTaskDto.From(task));
+    }
 
-        return result.Status switch
+    [HttpPut("tasks/{taskId:guid}")]
+    [RequestSizeLimit(MaxUpdateRequestBytes)]
+    [RequestFormLimits(MultipartBodyLengthLimit = MaxUpdateRequestBytes)]
+    public async Task<IResult> UpdateTaskAsync(
+        Guid projectId, Guid taskId, [FromForm] UpdateProjectTaskRequest request, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
         {
-            TaskUpdateStatus.Updated => Results.Ok(ProjectTaskDto.From(result.Task!)),
-            TaskUpdateStatus.DeadlineBeforeAssigned => Results.ValidationProblem(new Dictionary<string, string[]>
+            return Results.Unauthorized();
+        }
+
+        // Non-empty Title/AssigneeName and the attachment rules are guaranteed by UpdateProjectTaskRequestValidator.
+        var streams = request.Attachments.Select(f => f.OpenReadStream()).ToList();
+        try
+        {
+            var attachments = request.Attachments
+                .Select((f, i) => new TaskAttachment(f.FileName, f.ContentType, f.Length, streams[i]))
+                .ToList();
+            var command = new UpdateProjectTaskCommand(
+                request.Title!, request.AssigneeName!, request.AssignedDate, request.Deadline, request.PhaseId,
+                request.Status, request.Description, attachments, request.RemoveAttachmentIds);
+            var result = await dashboardService.UpdateTaskAsync(userId, projectId, taskId, command, cancellationToken);
+
+            return result.Status switch
             {
-                ["deadline"] = ["Deadline must be on or after the assigned date."],
-            }),
-            _ => Results.NotFound(),
-        };
+                TaskUpdateStatus.Updated => Results.Ok(ProjectTaskDto.From(result.Task!)),
+                TaskUpdateStatus.DeadlineBeforeAssigned => Results.ValidationProblem(new Dictionary<string, string[]>
+                {
+                    ["deadline"] = ["Deadline must be on or after the assigned date."],
+                }),
+                _ => Results.NotFound(),
+            };
+        }
+        finally
+        {
+            foreach (var stream in streams)
+            {
+                await stream.DisposeAsync();
+            }
+        }
+    }
+
+    [HttpDelete("tasks/{taskId:guid}")]
+    public async Task<IResult> DeleteTaskAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    {
+        var userId = User.GetUserId();
+        if (userId is null)
+        {
+            return Results.Unauthorized();
+        }
+
+        return await dashboardService.DeleteTaskAsync(userId, projectId, taskId, cancellationToken)
+            ? Results.NoContent()
+            : Results.NotFound();
     }
 
     [HttpPost("tasks/{taskId:guid}/extend-deadline")]

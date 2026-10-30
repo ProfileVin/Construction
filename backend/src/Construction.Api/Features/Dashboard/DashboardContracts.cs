@@ -1,3 +1,4 @@
+using Construction.Api.Features.ChangeOrders;
 using Construction.Domain.Entities;
 
 namespace Construction.Api.Features.Dashboard;
@@ -23,13 +24,30 @@ public class CreateProjectTaskRequest
     public IFormFile? Attachment { get; set; }
 }
 
-/// <summary>JSON body for editing a task. Strings are nullable for the same reason as the create request.</summary>
-public record UpdateProjectTaskRequest(
-    string? Title,
-    string? AssigneeName,
-    DateOnly Deadline,
-    Guid? PhaseId,
-    ProjectTaskStatus Status);
+/// <summary>
+/// Multipart body for editing a task (Edit Task / Edit Task Log): new files ride along and
+/// <see cref="RemoveAttachmentIds"/> unlinks existing ones. Nullable for the same reason as the create request.
+/// </summary>
+public class UpdateProjectTaskRequest
+{
+    public string? Title { get; set; }
+
+    public string? AssigneeName { get; set; }
+
+    public DateOnly AssignedDate { get; set; }
+
+    public DateOnly Deadline { get; set; }
+
+    public Guid? PhaseId { get; set; }
+
+    public ProjectTaskStatus Status { get; set; }
+
+    public string? Description { get; set; }
+
+    public List<IFormFile> Attachments { get; set; } = [];
+
+    public List<Guid> RemoveAttachmentIds { get; set; } = [];
+}
 
 public record ProjectTaskDto(
     Guid Id,
@@ -42,11 +60,14 @@ public record ProjectTaskDto(
     string? PhaseName,
     ProjectTaskStatus Status,
     Guid? AttachmentDocumentId,
-    DateTime CreatedAt)
+    DateTime CreatedAt,
+    string? Description,
+    IReadOnlyList<ChangeOrderAttachmentDto> Attachments)
 {
     public static ProjectTaskDto From(Construction.Application.Dashboard.ProjectTaskDto t) => new(
         t.Id, t.ProjectId, t.Title, t.AssigneeName, t.AssignedDate, t.Deadline,
-        t.PhaseId, t.PhaseName, t.Status, t.AttachmentDocumentId, t.CreatedAt);
+        t.PhaseId, t.PhaseName, t.Status, t.AttachmentDocumentId, t.CreatedAt, t.Description,
+        t.Attachments.Select(a => new ChangeOrderAttachmentDto(a.DocumentId, a.FileName, a.SizeBytes, a.Format)).ToList());
 }
 
 public record ActivityLogEntryDto(

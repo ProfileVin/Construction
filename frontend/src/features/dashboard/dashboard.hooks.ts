@@ -3,7 +3,9 @@ import { useProjectStore } from '../../stores/projectStore'
 import {
   createActivityLog,
   createProjectTask,
+  deleteProjectTask,
   extendTaskDeadline,
+  getProjectTask,
   listActivityLog,
   listProjectTasks,
   listTaskActivityLog,
@@ -25,6 +27,15 @@ export function useProjectTasks(projectId: string | undefined) {
     queryKey: ['dashboard', 'tasks', projectId],
     queryFn: () => listProjectTasks(projectId as string),
     enabled: Boolean(projectId),
+  })
+}
+
+/** Keyed under the project's task key, so every task invalidation refreshes it too. */
+export function useProjectTask(projectId: string | undefined, taskId: string | undefined) {
+  return useQuery({
+    queryKey: ['dashboard', 'tasks', projectId, taskId],
+    queryFn: () => getProjectTask(projectId as string, taskId as string),
+    enabled: Boolean(projectId && taskId),
   })
 }
 
@@ -52,6 +63,14 @@ export function useUpdateProjectTask(projectId: string | undefined) {
   return useMutation({
     mutationFn: ({ taskId, payload }: { taskId: string; payload: UpdateProjectTaskPayload }) =>
       updateProjectTask(projectId as string, taskId, payload),
+    onSuccess: () => invalidateTaskQueries(qc, projectId),
+  })
+}
+
+export function useDeleteProjectTask(projectId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (taskId: string) => deleteProjectTask(projectId as string, taskId),
     onSuccess: () => invalidateTaskQueries(qc, projectId),
   })
 }

@@ -70,6 +70,18 @@ public class DashboardService(
         return ProjectTaskDto.From(task, phaseName);
     }
 
+    public async Task<ProjectTaskDto?> GetTaskAsync(
+        string ownerId, Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    {
+        if (!await projects.ExistsForOwnerAsync(projectId, ownerId, cancellationToken))
+        {
+            return null;
+        }
+
+        var task = await tasks.GetAsync(projectId, taskId, cancellationToken);
+        return task is null ? null : await ToDetailAsync(task, cancellationToken);
+    }
+
     public async Task<TaskUpdateResult> UpdateTaskAsync(
         string ownerId, Guid projectId, Guid taskId, UpdateProjectTaskCommand command, CancellationToken cancellationToken)
     {
@@ -84,7 +96,7 @@ public class DashboardService(
             return new TaskUpdateResult(TaskUpdateStatus.NotFound);
         }
 
-        if (command.Deadline < task.AssignedDate)
+        if (command.Deadline < command.AssignedDate)
         {
             return new TaskUpdateResult(TaskUpdateStatus.DeadlineBeforeAssigned);
         }
@@ -95,19 +107,62 @@ public class DashboardService(
 
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
         var previousStatus = task.Status;
-        task.Update(command.Title, command.AssigneeName, command.Deadline, phaseId, command.Status, nowUtc);
+        task.Update(
+            command.Title, command.AssigneeName, command.AssignedDate, command.Deadline, phaseId, command.Status,
+            command.Description, nowUtc);
 
-        if (task.Status != previousStatus)
+        var removeIds = command.RemoveAttachmentIds ?? [];
+        if (task.AttachmentDocumentId is { } legacyId && removeIds.Contains(legacyId))
         {
-            await AddLogEntryAsync(
-                projectId, $"Task \"{task.Title}\" marked {StatusLabel(task.Status)}", task.Id, nowUtc, cancellationToken);
+            task.ClearAttachment();
         }
 
-        await unitOfWork.SaveChangesAsync(cancellationToken);
+        if (removeIds.Count > 0)
+        {
+            await tasks.RemoveAttachmentsAsync(task.Id, removeIds, cancellationToken);
+        }
 
-        return new TaskUpdateResult(
-            TaskUpdateStatus.Updated,
-            ProjectTaskDto.From(task, phaseId is { } id ? phaseNames[id] : null));
+        var uploads = new List<(ProjectDocument, TaskAttachment)>();
+        foreach (var file in command.Attachments ?? [])
+        {
+            var document = await attachments.BuildAsync(ownerId, projectId, phaseId, file, nowUtc, cancellationToken);
+            uploads.Add((document!, file));
+        }
+
+        await attachments.SaveWithAsync(uploads, async () =>
+        {
+            foreach (var (document, _) in uploads)
+            {
+                await tasks.AddAttachmentAsync(ProjectTaskAttachment.Create(task.Id, document.Id), cancellationToken);
+            }
+
+            if (task.Status != previousStatus)
+            {
+                await AddLogEntryAsync(
+                    projectId, $"Task \"{task.Title}\" marked {StatusLabel(task.Status)}", task.Id, nowUtc, cancellationToken);
+            }
+        }, cancellationToken);
+
+        return new TaskUpdateResult(TaskUpdateStatus.Updated, await ToDetailAsync(task, cancellationToken));
+    }
+
+    public async Task<bool> DeleteTaskAsync(string ownerId, Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    {
+        if (!await projects.ExistsForOwnerAsync(projectId, ownerId, cancellationToken))
+        {
+            return false;
+        }
+
+        var task = await tasks.GetAsync(projectId, taskId, cancellationToken);
+        if (task is null)
+        {
+            return false;
+        }
+
+        await activityLog.RemoveByTaskAsync(projectId, taskId, cancellationToken);
+        tasks.Remove(task);
+        await unitOfWork.SaveChangesAsync(cancellationToken);
+        return true;
     }
 
     public async Task<TaskUpdateResult> ExtendTaskDeadlineAsync(
@@ -131,7 +186,8 @@ public class DashboardService(
 
         var nowUtc = timeProvider.GetUtcNow().UtcDateTime;
         var previousDeadline = task.Deadline;
-        task.Update(task.Title, task.AssigneeName, newDeadline, task.PhaseId, task.Status, nowUtc);
+        task.Update(
+            task.Title, task.AssigneeName, task.AssignedDate, newDeadline, task.PhaseId, task.Status, task.Description, nowUtc);
 
         var culture = System.Globalization.CultureInfo.InvariantCulture;
         await AddLogEntryAsync(
@@ -247,8 +303,18 @@ public class DashboardService(
     private static string StatusLabel(ProjectTaskStatus status) => status switch
     {
         ProjectTaskStatus.InProgress => "In Progress",
+        ProjectTaskStatus.OnHold => "On Hold",
+        ProjectTaskStatus.PendingReview => "Pending Review",
         _ => status.ToString(),
     };
+
+    private async Task<ProjectTaskDto> ToDetailAsync(ProjectTask task, CancellationToken cancellationToken)
+    {
+        var phaseName = task.PhaseId is { } phaseId
+            ? (await phases.ListByProjectAsync(task.ProjectId, cancellationToken)).FirstOrDefault(p => p.Id == phaseId)?.Name
+            : null;
+        return ProjectTaskDto.From(task, phaseName, await tasks.ListAttachmentsAsync(task, cancellationToken));
+    }
 
     /// <summary>Joins each entry to its task and that task's phase (numbered in start-date order).</summary>
     private async Task<IReadOnlyList<ActivityLogEntryDto>> ToDtosAsync(

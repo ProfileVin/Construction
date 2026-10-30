@@ -17,6 +17,52 @@ Entry template:
 
 ---
 
+## 2026-10-30 — Task Log: View Details / Edit Task Log / Delete Log redesign (FEAT-034)
+**Refs:** FEAT-034, FEAT-020, ADR-0030
+**What:**
+- **Frontend:**
+  - Task Log → View Details opens the new `TaskLogDetailsDialog`: status pill, Delete, Assignee (+ team role),
+    Logged / Due dates, Summary & Scope, and attachment pills.
+  - New `EditTaskLogDialog`: name, phase, assignee, logged + due dates, a 4-segment status (reusing the
+    `.expense-status-toggle` look via `.task-log-status-toggle`), description, and add/unlink files.
+  - New `DeleteTaskLogDialog`: red confirm. A `.p-button-danger` CSS rule keeps the red fill.
+    *Update:* scoped `.delete-confirm-dialog` rules give it the mockup's buttons (6px corners, weight 500,
+    grey-outlined Cancel, `#ff3b3b` Delete Log); no other dialog changes.
+  - `StatusBadge` gained On Hold and Pending Review.
+  - The Schedule `EditTaskDialog` sends the assigned date and description unchanged.
+- **Backend:**
+  - `ProjectTask.Description`, `OnHold` / `PendingReview`, `ProjectTaskAttachment` + migration `AddTaskLogDetails`.
+  - `GET` / `DELETE tasks/{id}`; `PUT` is now multipart with files and `removeAttachmentIds`.
+  - Repository methods for links and for removing a task's log entries; validator rules for the description
+    and the files.
+**Why:** The user's new Task Log mockups, which should differ from the Schedule dialog.
+**Files:**
+- `frontend/src/features/task-log/{TaskLogDetailsDialog,EditTaskLogDialog,DeleteTaskLogDialog,TaskLogTable}.tsx`
+- `frontend/src/features/dashboard/{dashboard.api,dashboard.hooks,dashboard.schema}.ts`, `EditTaskDialog.tsx`
+- `frontend/src/components/StatusBadge.tsx`, `frontend/src/features/schedule/schedule.api.ts`, `frontend/src/index.css`
+- `backend/src/Construction.Domain/Entities/ProjectTask.cs`, `AppDbContext.cs`, `Persistence/Migrations/*AddTaskLogDetails*`
+- `ProjectTaskRepository.cs`, `ActivityLogRepository.cs` (+ interfaces), `DashboardService.cs`, `IDashboardService.cs`
+- `ProjectTaskDto.cs`, `UpdateProjectTaskCommand.cs`, `DashboardController.cs`, `DashboardContracts.cs`
+- `UpdateProjectTaskRequestValidator.cs`, `Construction.Api.http`
+**Verification:**
+- `npm run build` and `npm run lint` are clean. `dotnet build -c Release` succeeds (the running :5080 API locks
+  the Debug DLLs).
+- Applied the migration with `dotnet ef database update`. `DbSeeder.SeedAsync` is commented out in `Program.cs`,
+  so migrations no longer auto-apply.
+- New build on :5081, with curl against throwaway tasks:
+  - GET detail works.
+  - PUT with 2 files + On Hold + description → 200 with both files listed.
+  - PUT with `removeAttachmentIds` → the file is unlinked and still in Documents.
+  - Due date before the logged date → 400.
+  - DELETE → 204, then GET → 404 and DELETE → 404. The task's entries are gone from the Recent Log.
+- Playwright on a second Vite (:5174 → :5081), in the "safe to delete" test project:
+  - Details, Edit (On Hold + unlink a file + Save → details refresh) and Delete (row removed) all work and
+    match the mockups.
+**Follow-ups:**
+- Restart the :5080 API to pick up the change.
+- Deleting a task leaves a harmless 404 in the console: the open details query refetches before the dialog closes.
+- The README / ARCHITECTURE line "migrations auto-apply in Development" is stale while the seeder is disabled.
+
 ## 2026-10-28 — Change Order Inspect: Summary & Scope + Attachments always shown (BUG-015)
 **Refs:** BUG-015, FEAT-031, ADR-0029
 **What:**

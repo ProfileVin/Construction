@@ -2,13 +2,17 @@ using Construction.Domain.Entities;
 
 namespace Construction.Application.Dashboard;
 
-/// <summary>The editable fields of a task — the assigned date and attachment stay as created.</summary>
+/// <summary>The editable fields of a task, plus files to attach and attached documents to unlink.</summary>
 public record UpdateProjectTaskCommand(
     string Title,
     string AssigneeName,
+    DateOnly AssignedDate,
     DateOnly Deadline,
     Guid? PhaseId,
-    ProjectTaskStatus Status);
+    ProjectTaskStatus Status,
+    string? Description,
+    IReadOnlyList<TaskAttachment>? Attachments = null,
+    IReadOnlyCollection<Guid>? RemoveAttachmentIds = null);
 
 public enum TaskUpdateStatus
 {

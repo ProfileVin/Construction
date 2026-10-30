@@ -37,4 +37,12 @@ public class ActivityLogRepository(AppDbContext db) : IActivityLogRepository
         db.ActivityLogEntries.Add(entry);
         return Task.CompletedTask;
     }
+
+    public async Task RemoveByTaskAsync(Guid projectId, Guid taskId, CancellationToken cancellationToken)
+    {
+        var entries = await db.ActivityLogEntries
+            .Where(e => e.ProjectId == projectId && e.ProjectTaskId == taskId)
+            .ToListAsync(cancellationToken);
+        db.ActivityLogEntries.RemoveRange(entries);
+    }
 }

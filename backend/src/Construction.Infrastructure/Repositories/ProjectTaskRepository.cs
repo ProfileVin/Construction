@@ -87,4 +87,31 @@ public class ProjectTaskRepository(AppDbContext db) : IProjectTaskRepository
         db.ProjectTasks.Add(task);
         return Task.CompletedTask;
     }
+
+    public void Remove(ProjectTask task) => db.ProjectTasks.Remove(task);
+
+    public Task AddAttachmentAsync(ProjectTaskAttachment attachment, CancellationToken cancellationToken)
+    {
+        db.ProjectTaskAttachments.Add(attachment);
+        return Task.CompletedTask;
+    }
+
+    public async Task RemoveAttachmentsAsync(
+        Guid taskId, IReadOnlyCollection<Guid> documentIds, CancellationToken cancellationToken)
+    {
+        var links = await db.ProjectTaskAttachments
+            .Where(a => a.ProjectTaskId == taskId && documentIds.Contains(a.DocumentId))
+            .ToListAsync(cancellationToken);
+        db.ProjectTaskAttachments.RemoveRange(links);
+    }
+
+    public async Task<IReadOnlyList<ProjectDocument>> ListAttachmentsAsync(
+        ProjectTask task, CancellationToken cancellationToken)
+    {
+        var linkedIds = db.ProjectTaskAttachments.Where(a => a.ProjectTaskId == task.Id).Select(a => a.DocumentId);
+        return await db.ProjectDocuments
+            .Where(d => d.Id == task.AttachmentDocumentId || linkedIds.Contains(d.Id))
+            .OrderBy(d => d.CreatedAt).ThenBy(d => d.OriginalFileName)
+            .ToListAsync(cancellationToken);
+    }
 }

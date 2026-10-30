@@ -12,6 +12,7 @@ This repo is developed AI-first. Living documentation and state tracking live in
 | File | Purpose |
 | ---- | ------- |
 | [`CLAUDE.md`](CLAUDE.md) | Operating rules — read-first / update-after checklist |
+| [`Techstack.md`](Techstack.md) | Full tech stack with versions |
 | [`docs/PROJECT.md`](docs/PROJECT.md) | Vision, scope, stack, glossary |
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | Module maps + patterns to reuse |
 | [`docs/DECISIONS.md`](docs/DECISIONS.md) | ADR log |
@@ -29,7 +30,7 @@ the full development history.
 | Layer     | Tech                                                                                             |
 | --------- | ----------------------------------------------------------------------------------------------- |
 | Frontend  | React 19, TypeScript, Vite, Tailwind CSS v4, PrimeReact + PrimeIcons, React Router, TanStack Query, Axios, Zustand, React Hook Form, Zod, Day.js |
-| Backend   | .NET 10, ASP.NET Core Web API (minimal APIs), EF Core (SQL Server), ASP.NET Core Identity, JWT bearer auth, FluentValidation, Mapster, Serilog, OpenAPI + Scalar |
+| Backend   | .NET 10, ASP.NET Core Web API (MVC Controllers), EF Core (SQL Server), ASP.NET Core Identity, JWT bearer auth, FluentValidation, Serilog, OpenAPI + Scalar |
 | Database  | SQL Server LocalDB (`(localdb)\MSSQLLocalDB`, database `Construction`)                           |
 
 ## Prerequisites
@@ -81,6 +82,12 @@ dotnet run
 | POST   | `/api/projects/{id}/budget/change-orders` | bearer JWT | JSON create (`description` ≤ 500, `amount` > 0, `requestedDate`, optional `reason` ≤ 2000) → 201 Pending CO numbered `CO-0001`… |
 | POST   | `/api/projects/{id}/budget/change-orders/{coId}/approve` | bearer JWT | Pending → Approved → updated CO; 409 when not Pending |
 | POST   | `/api/projects/{id}/budget/change-orders/{coId}/reject` | bearer JWT | Pending → Rejected → updated CO; 409 when not Pending |
+| GET    | `/api/projects/{id}/budget/payments` | bearer JWT | Paged payments (`search` matches PAY# or payer/payee; `status` = Processing/Cleared; `page`, `pageSize`), newest payment date first |
+| GET    | `/api/projects/{id}/budget/payments/summary` | bearer JWT | `totalReceived` / `totalDisbursed` — Cleared inbound / outbound only |
+| GET    | `/api/projects/{id}/budget/payments/payees` | bearer JWT | Distinct names used on the project (payments, PO vendors, invoice vendors) for the payee dropdown |
+| POST   | `/api/projects/{id}/budget/payments` | bearer JWT | JSON create (`direction` = Inbound/Outbound, `partyName` ≤ 200, `amount` > 0, `paymentDate`, `method` = Ach/Wire/PayPal/Check, optional `notes` ≤ 2000) → 201 Processing payment numbered `PAY-0001`… |
+| POST   | `/api/projects/{id}/budget/payments/{paymentId}/mark-cleared` | bearer JWT | Processing → Cleared → updated payment |
+| DELETE | `/api/projects/{id}/budget/payments/{paymentId}` | bearer JWT | 204; 409 when the payment is already Cleared |
 | GET    | `/api/projects/{id}/budget/invoices` | bearer JWT | Paged invoices (optional `search` = invoice # or vendor, `status` = Pending/Paid/Scheduled; `page`, `pageSize`) |
 | GET    | `/api/projects/{id}/budget/invoices/summary` | bearer JWT | `totalContractValue` (budget + approved change orders), `totalBilledToDate`, `approvedInvoices` (Paid + Scheduled) |
 | POST   | `/api/projects/{id}/budget/invoices/{invoiceId}/mark-paid` | bearer JWT | → Paid → updated invoice |

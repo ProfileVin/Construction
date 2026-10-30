@@ -1,6 +1,7 @@
 import { api } from '../../lib/api'
+import type { ChangeOrderAttachment } from '../change-orders/changeOrders.api'
 
-export type ProjectTaskStatus = 'Upcoming' | 'InProgress' | 'Completed'
+export type ProjectTaskStatus = 'Upcoming' | 'InProgress' | 'Completed' | 'OnHold' | 'PendingReview'
 
 export interface ProjectTask {
   id: string
@@ -15,6 +16,9 @@ export interface ProjectTask {
   /** The `ProjectDocument` attached when the task was created, if any. */
   attachmentDocumentId: string | null
   createdAt: string
+  description: string | null
+  /** Filled only by `getProjectTask` and the update response; lists return []. */
+  attachments: ChangeOrderAttachment[]
 }
 
 export interface CreateProjectTaskPayload {
@@ -27,14 +31,19 @@ export interface CreateProjectTaskPayload {
   attachment?: File
 }
 
-/** The editable fields — the assigned date and attachment stay as created. */
 export interface UpdateProjectTaskPayload {
   title: string
   assigneeName: string
   /** YYYY-MM-DD */
+  assignedDate: string
+  /** YYYY-MM-DD */
   deadline: string
   phaseId: string | null
   status: ProjectTaskStatus
+  description: string | null
+  attachments?: File[]
+  /** Attached documents to unlink from the task (they stay in Documents). */
+  removeAttachmentIds?: string[]
 }
 
 export interface ActivityLogEntry {
@@ -89,13 +98,37 @@ export async function createProjectTask(
   return data
 }
 
+export async function getProjectTask(projectId: string, taskId: string): Promise<ProjectTask> {
+  const { data } = await api.get<ProjectTask>(`/projects/${projectId}/tasks/${taskId}`)
+  return data
+}
+
 export async function updateProjectTask(
   projectId: string,
   taskId: string,
   payload: UpdateProjectTaskPayload,
 ): Promise<ProjectTask> {
-  const { data } = await api.put<ProjectTask>(`/projects/${projectId}/tasks/${taskId}`, payload)
+  const form = new FormData()
+  form.append('title', payload.title)
+  form.append('assigneeName', payload.assigneeName)
+  form.append('assignedDate', payload.assignedDate)
+  form.append('deadline', payload.deadline)
+  form.append('status', payload.status)
+  if (payload.phaseId) form.append('phaseId', payload.phaseId)
+  if (payload.description) form.append('description', payload.description)
+  for (const file of payload.attachments ?? []) form.append('attachments', file)
+  for (const id of payload.removeAttachmentIds ?? []) form.append('removeAttachmentIds', id)
+
+  // Same multipart override as createProjectTask.
+  const { data } = await api.put<ProjectTask>(`/projects/${projectId}/tasks/${taskId}`, form, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+  })
   return data
+}
+
+/** Also deletes the task's activity-log entries; its documents stay in the library. */
+export async function deleteProjectTask(projectId: string, taskId: string): Promise<void> {
+  await api.delete(`/projects/${projectId}/tasks/${taskId}`)
 }
 
 /** Moves the deadline later; the API logs "Deadline extended … — {reason}" on the task. */

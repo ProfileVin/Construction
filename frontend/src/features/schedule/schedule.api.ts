@@ -1,7 +1,7 @@
 import { api } from '../../lib/api'
-import type { ProjectTaskStatus } from '../dashboard/dashboard.api'
 
-export type PhaseStatus = ProjectTaskStatus
+/** Mirrors PhaseStatus on the API (a subset of the task statuses, so StatusBadge renders it). */
+export type PhaseStatus = 'Upcoming' | 'InProgress' | 'Completed'
 
 export interface ConstructionPhase {
   id: string

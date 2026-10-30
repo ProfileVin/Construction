@@ -11,9 +11,15 @@ public interface IDashboardService
         CancellationToken cancellationToken,
         DateTime? occurredAtUtc = null);
 
+    /// <summary>The task with its attachments. Null when the project isn't the owner's or the task isn't in it.</summary>
+    Task<ProjectTaskDto?> GetTaskAsync(string ownerId, Guid projectId, Guid taskId, CancellationToken cancellationToken);
+
     /// <summary>Adds a numbered activity-log row when the status changes.</summary>
     Task<TaskUpdateResult> UpdateTaskAsync(
         string ownerId, Guid projectId, Guid taskId, UpdateProjectTaskCommand command, CancellationToken cancellationToken);
+
+    /// <summary>Deletes the task and its activity-log entries; its documents stay in the library. False when not found.</summary>
+    Task<bool> DeleteTaskAsync(string ownerId, Guid projectId, Guid taskId, CancellationToken cancellationToken);
 
     /// <summary>Moves the deadline later and logs the reason on the task.</summary>
     Task<TaskUpdateResult> ExtendTaskDeadlineAsync(

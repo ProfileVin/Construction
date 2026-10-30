@@ -10,6 +10,8 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
 
     public DbSet<ProjectTask> ProjectTasks => Set<ProjectTask>();
 
+    public DbSet<ProjectTaskAttachment> ProjectTaskAttachments => Set<ProjectTaskAttachment>();
+
     public DbSet<ConstructionPhase> ConstructionPhases => Set<ConstructionPhase>();
 
     public DbSet<BudgetCategory> BudgetCategories => Set<BudgetCategory>();
@@ -59,6 +61,7 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
         {
             entity.Property(t => t.Title).HasMaxLength(1000).IsRequired();
             entity.Property(t => t.AssigneeName).HasMaxLength(200).IsRequired();
+            entity.Property(t => t.Description).HasMaxLength(2000);
             entity.Property(t => t.AssignedDate).HasColumnType("date");
             entity.Property(t => t.Deadline).HasColumnType("date");
             entity.Property(t => t.Status).HasConversion<string>().HasMaxLength(40)
@@ -201,6 +204,21 @@ public class AppDbContext(DbContextOptions<AppDbContext> options) : IdentityDbCo
                 .WithMany()
                 .HasForeignKey(c => c.CategoryId)
                 .OnDelete(DeleteBehavior.ClientSetNull);
+        });
+
+        builder.Entity<ProjectTaskAttachment>(entity =>
+        {
+            entity.HasKey(a => new { a.ProjectTaskId, a.DocumentId });
+            entity.HasIndex(a => a.DocumentId);
+            entity.HasOne<ProjectTask>()
+                .WithMany()
+                .HasForeignKey(a => a.ProjectTaskId)
+                .OnDelete(DeleteBehavior.Cascade);
+            // Restrict for the same multiple-cascade-path reason as Invoice.ReceiptDocumentId.
+            entity.HasOne<ProjectDocument>()
+                .WithMany()
+                .HasForeignKey(a => a.DocumentId)
+                .OnDelete(DeleteBehavior.Restrict);
         });
 
         builder.Entity<ChangeOrderAttachment>(entity =>

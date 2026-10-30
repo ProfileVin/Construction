@@ -28,3 +28,7 @@ pnpm-debug.log*
 backend/**/logs/
 backend/**/App_Data/
 *.user
+
+# Local-only demo-data seeder (removed from history)
+backend/src/Construction.Api/Common/DbSeeder.cs
+Techstack.md

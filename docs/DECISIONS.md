@@ -799,3 +799,32 @@ whose description matches a seed: it fills a null Scope / RequestedByName and at
 than a new service method, because this is dev-only demo data and shouldn't grow the application API.
 **Consequences:** The top-up is idempotent (null checks / "no attachments" filter). User-created COs are never
 matched unless they share a seed description exactly. Each demo CO adds 2 small documents to the Documents tab.
+
+
+## ADR-0030 — Task Log: own details dialog, multipart task edit, task attachments link table, hard delete
+**Status:** Accepted (2026-10-30)
+**Context:** The Task Log mockups (FEAT-034) need a task summary, several attachments with names and sizes, an
+editable logged date, On Hold / Pending Review statuses, and deleting a row. Tasks had none of these. Task Log
+had reused the Schedule `TaskDetailsDialog`; the user wants the two views to differ.
+**Decision:**
+- **Separate dialogs.** Task Log gets `TaskLogDetailsDialog` / `EditTaskLogDialog` / `DeleteTaskLogDialog`.
+  Schedule keeps `TaskDetailsDialog` + `EditTaskDialog`.
+- **`ProjectTask.Description`** (nullable, 2000) backs Summary & Scope. `ProjectTask.Update` now also takes the
+  assigned date and the description, and still requires deadline ≥ assigned date.
+- **Statuses** gain `OnHold` and `PendingReview`. They are stored as strings, so there's no data change. The
+  user chose exactly the 4 mockup options in Edit Task Log. `Upcoming` stays in the enum (New Task and Schedule
+  use it), and an Upcoming task keeps it unless a segment is picked. The front-end `PhaseStatus` is now its own
+  3-value union instead of aliasing the task status.
+- **Attachments** use a `ProjectTaskAttachments (ProjectTaskId, DocumentId)` link table, as ADR-0027 did for
+  change orders: cascade from the task, Restrict to the document. The FEAT-018 `AttachmentDocumentId` column is
+  kept and listed with the linked files, so existing tasks need no data migration. Removing a file only unlinks
+  it (the user's choice); the document stays in Documents. `ChangeOrderAttachmentDto` is reused as the file DTO.
+- **`PUT tasks/{id}` is multipart** (fields + `attachments` files + `removeAttachmentIds`), so one save is
+  atomic through `AttachmentUploader.SaveWithAsync`. It accepts up to 5 new files of 25 MB, the same cap as
+  change orders. The Schedule `EditTaskDialog` sends the current assigned date and description unchanged.
+- **`GET tasks/{id}`** returns the task with its attachments; lists keep returning `attachments: []`.
+- **`DELETE tasks/{id}`** hard-deletes the task and its activity-log entries (that FK is Restrict, so the entries
+  go first). The entries also leave the Dashboard Recent Log. Documents are kept (the user's choice).
+**Consequences:** A delete can't be undone, and LOG numbers aren't reused. The sequence is count + 1, so a later
+log can repeat an earlier number after deletes. API clients sending JSON to the task PUT must switch to
+multipart. Restart the :5080 API after pulling, since the old build has no `Description` mapping.

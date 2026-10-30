@@ -515,6 +515,10 @@ namespace Construction.Infrastructure.Persistence.Migrations
                     b.Property<DateOnly>("Deadline")
                         .HasColumnType("date");
 
+                    b.Property<string>("Description")
+                        .HasMaxLength(2000)
+                        .HasColumnType("nvarchar(2000)");
+
                     b.Property<Guid?>("PhaseId")
                         .HasColumnType("uniqueidentifier");
 
@@ -545,6 +549,21 @@ namespace Construction.Infrastructure.Persistence.Migrations
                     b.HasIndex("ProjectId");
 
                     b.ToTable("ProjectTasks");
+                });
+
+            modelBuilder.Entity("Construction.Domain.Entities.ProjectTaskAttachment", b =>
+                {
+                    b.Property<Guid>("ProjectTaskId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.Property<Guid>("DocumentId")
+                        .HasColumnType("uniqueidentifier");
+
+                    b.HasKey("ProjectTaskId", "DocumentId");
+
+                    b.HasIndex("DocumentId");
+
+                    b.ToTable("ProjectTaskAttachments");
                 });
 
             modelBuilder.Entity("Construction.Domain.Entities.PurchaseOrder", b =>
@@ -1575,6 +1594,21 @@ namespace Construction.Infrastructure.Persistence.Migrations
                     b.HasOne("Construction.Domain.Entities.Project", null)
                         .WithMany()
                         .HasForeignKey("ProjectId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+                });
+
+            modelBuilder.Entity("Construction.Domain.Entities.ProjectTaskAttachment", b =>
+                {
+                    b.HasOne("Construction.Domain.Entities.ProjectDocument", null)
+                        .WithMany()
+                        .HasForeignKey("DocumentId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired();
+
+                    b.HasOne("Construction.Domain.Entities.ProjectTask", null)
+                        .WithMany()
+                        .HasForeignKey("ProjectTaskId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
                 });

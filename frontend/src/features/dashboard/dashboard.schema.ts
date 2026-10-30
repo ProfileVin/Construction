@@ -6,7 +6,12 @@ export const taskStatusOptions = [
   { label: 'Upcoming', value: 'Upcoming' },
   { label: 'In Progress', value: 'InProgress' },
   { label: 'Completed', value: 'Completed' },
+  { label: 'On Hold', value: 'OnHold' },
+  { label: 'Pending Review', value: 'PendingReview' },
 ] as const
+
+/** Edit Task Log offers only these four (Upcoming stays valid for existing tasks). */
+export const taskLogStatusOptions = taskStatusOptions.filter((o) => o.value !== 'Upcoming')
 
 // Mirrors DocumentUploadRules.TaskAttachmentMaxSizeBytes on the API.
 export const MAX_TASK_ATTACHMENT_BYTES = 25 * 1024 * 1024
@@ -50,10 +55,27 @@ export const editTaskSchema = z.object({
   assigneeName: createTaskSchema.shape.assigneeName,
   deadline: z.date({ message: 'Select a deadline' }),
   phaseId: z.string().nullable(),
-  status: z.enum(['Upcoming', 'InProgress', 'Completed']),
+  status: z.enum(['Upcoming', 'InProgress', 'Completed', 'OnHold', 'PendingReview']),
 })
 
 export type EditTaskValues = z.infer<typeof editTaskSchema>
+
+// Mirrors the API's change-order attachment cap, reused by the task update.
+export const MAX_TASK_LOG_ATTACHMENTS = 5
+
+export const editTaskLogSchema = editTaskSchema
+  .extend({
+    assignedDate: z.date({ message: 'Select a logged date' }),
+    description: z.string().trim().max(2000, 'Keep the description under 2000 characters'),
+    attachments: z.array(createTaskSchema.shape.attachment.unwrap()),
+    removeAttachmentIds: z.array(z.string()),
+  })
+  .refine((v) => !dayjs(v.deadline).isBefore(v.assignedDate, 'day'), {
+    message: 'Due date must be on or after the logged date',
+    path: ['deadline'],
+  })
+
+export type EditTaskLogValues = z.infer<typeof editTaskLogSchema>
 
 // Mirrors DeadlineExtensionReasons.All on the API.
 export const deadlineExtensionReasons = [
