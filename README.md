@@ -48,8 +48,6 @@ dotnet run
 
 - Listens on `http://localhost:5080` (see `Properties/launchSettings.json`).
 - On startup in **Development** it applies EF migrations and seeds a demo user:
-  - **Email:** `admin@construction.local`
-  - **Password:** `Passw0rd!`
 - API docs (Development only): `http://localhost:5080/scalar/v1`
 - Health check: `http://localhost:5080/health`
 
